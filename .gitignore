@@ -1,0 +1,4 @@
+**/*.o
+project1/client
+project1/serverFork
+**/*.swp

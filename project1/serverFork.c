@@ -19,6 +19,8 @@ void sigchld_handler(int s)
 }
 
 void dostuff(int); /* function prototype */
+void writeErrorResponse(int);
+
 void error(char *msg)
 {
     perror(msg);
@@ -89,7 +91,6 @@ int main(int argc, char *argv[])
  for each connection.  It handles all communication
  once a connnection has been established.
  *****************************************/
-const char *errorHTML = "<!DOCTYPE HTML><html><head>404 Not Found</head><body><h3>Error: 404 Not Found</h3><p>The requested page does not exist or ran into an error.</p></body></html>\n";
 
 void dostuff (int sock)
 {
@@ -112,7 +113,7 @@ void dostuff (int sock)
      pch = (char *)strtok (NULL, "\n");
    }
 
-   char * fileName = "error.html";
+   char * fileName = "index.html";
    
    // Open file if it exists and write the contents to the HTTP response
    FILE *f = fopen(fileName, "rb");
@@ -141,4 +142,12 @@ void dostuff (int sock)
       free(fileContents);
       fclose(f);
    }
+}
+
+
+const char *errorHTML = "<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h3>Error: 404 Not Found</h3><p>The requested page does not exist or ran into an error.</p></body></html>";
+void writeErrorResponse(int sock) {
+   write(sock, "HTTP/1.1 404 Not Found\r\n", 24);
+   write(sock, "\r\n", 2);
+   write(sock, errorHTML, strlen(errorHTML));
 }

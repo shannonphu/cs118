@@ -8,7 +8,7 @@
 #include <sys/socket.h>  // definitions of structures needed for sockets, e.g. sockaddr
 #include <netinet/in.h>  // constants and structures needed for internet domain addresses, e.g. sockaddr_in
 #include <stdlib.h>
-#include <strings.h>
+#include <string.h>
 #include <sys/wait.h>	/* for the waitpid() system call */
 #include <signal.h>	/* signal name macros, and the kill() prototype */
 
@@ -89,6 +89,8 @@ int main(int argc, char *argv[])
  for each connection.  It handles all communication
  once a connnection has been established.
  *****************************************/
+const char *errorHTML = "<!DOCTYPE HTML><html><head>404 Not Found</head><body><h3>Error: 404 Not Found</h3><p>The requested page does not exist or ran into an error.</p></body></html>\n";
+
 void dostuff (int sock)
 {
    int n;
@@ -100,17 +102,43 @@ void dostuff (int sock)
    // printf("Here is the message: %s\n",buffer);
 
    // TODO: Parse HTTP Request
-   char * pch;
-   pch = strtok (buffer,"\n");
+   char * pch = (char *)strtok (buffer,"\n");
    while (pch != NULL) {
      // printf ("%s\n", pch);
      // Parse file name
      if (strstr(pch, "GET")) {
        printf ("%s\n", pch);
      }
-     pch = strtok (NULL, "\n");
+     pch = (char *)strtok (NULL, "\n");
    }
 
-   n = write(sock,"I got your message",18);
-   if (n < 0) error("ERROR writing to socket");
+   char * fileName = "error.html";
+   
+   // Open file if it exists and write the contents to the HTTP response
+   FILE *f = fopen(fileName, "rb");
+   if (f != NULL) {
+      char metadata[600];
+      bzero(metadata, 600); 
+
+      fseek(f, 0, SEEK_END);
+      long fsize = ftell(f);
+      fseek(f, 0, SEEK_SET);
+
+      write(sock, "HTTP/1.1 200 OK\r\n", 17);
+      sprintf(metadata, "Content-Length: %ld\r\n", fsize);
+      write(sock, metadata, strlen(metadata));
+      
+      char *fileContents = (char *)malloc(sizeof(char) * (fsize + 1));
+      bzero(fileContents, sizeof(fileContents));
+      int numberBytes = fread(fileContents, 1, fsize, f);
+
+      write(sock, "Connection: keep-alive\r\n", 24);
+      write(sock, "\r\n", 2);
+      n = write(sock, fileContents, fsize);
+      if (n < 0) error("ERROR writing to socket");
+      write(sock, "Connection: close\r\n", 19);
+      write(sock, "\r\n", 2);
+      free(fileContents);
+      fclose(f);
+   }
 }

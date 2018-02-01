@@ -3,6 +3,8 @@
 #include <sys/socket.h>  // definitions of structures needed for sockets, e.g. sockaddr
 #include <netinet/in.h>  // constants and structures needed for internet domain addresses, e.g. sockaddr_in
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/wait.h>	/* for the waitpid() system call */
 #include <signal.h>	/* signal name macros, and the kill() prototype */
@@ -13,6 +15,7 @@ void sigchld_handler(int s)
     while(waitpid(-1, NULL, WNOHANG) > 0);
 }
 
+int checkCorrectFile(const char* path);
 void dostuff(int); /* function prototype */
 void writeErrorResponse(int);
 char* parseHTTP(char*);
@@ -101,6 +104,12 @@ void dostuff (int sock)
    printf("HTTP Request Message:\n%s\n", buffer);
 
    char * fileName = parseHTTP(buffer);
+	
+   if (checkCorrectFile(fileName) != 1) {
+	//NEED TO SEND A RESPOND TO THE CLIENT
+	writeErrorResponse(sock);
+	return;
+   }
    
    // Open file if it exists and write the contents to the HTTP response
    FILE *f = fopen(fileName, "rb");
@@ -131,6 +140,15 @@ void dostuff (int sock)
    } else {
       writeErrorResponse(sock);
    }
+}
+
+int checkCorrectFile(const char* path) {
+    struct stat st;
+
+    if (stat(path, &st) < 0) 
+	return -1;
+
+     return S_ISREG(st.st_mode);
 }
 
 char* parseHTTP(char* url) {

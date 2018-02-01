@@ -98,34 +98,57 @@ void dostuff (int sock)
    if (n < 0) error("ERROR reading from socket");
    
    // Print out the HTTP request
-   printf("HTTP Request Message:\n%s\n", buffer);
+   // printf("HTTP Request Message:\n%s\n", buffer);
 
    char * fileName = parseHTTP(buffer);
    
    // Open file if it exists and write the contents to the HTTP response
    FILE *f = fopen(fileName, "rb");
    if (f != NULL) {
-      char metadata[600];
-      bzero(metadata, 600); 
-
       fseek(f, 0, SEEK_END);
       long fsize = ftell(f);
       fseek(f, 0, SEEK_SET);
-
-      write(sock, "HTTP/1.1 200 OK\r\n", 17);
-      sprintf(metadata, "Content-Length: %ld\r\n", fsize);
-      write(sock, metadata, strlen(metadata));
       
-      char *fileContents = (char *)malloc(sizeof(char) * (fsize + 1));
-      bzero(fileContents, sizeof(fileContents));
-      int numberBytes = fread(fileContents, 1, fsize, f);
+      char response[500000];
+      bzero(response, 500000); 
+      strcpy(response, "HTTP/1.1 200 OK\r\n\0");
+      // write(sock, "HTTP/1.1 200 OK\r\n", 17);
+      char contentLength[100];
+      bzero(contentLength, 100); 
+      sprintf(contentLength, "Content-Length: %ld\r\n", fsize);
+      strcat(response, contentLength);
+      // write(sock, metadata, strlen(metadata));
 
-      write(sock, "Connection: keep-alive\r\n", 24);
-      write(sock, "\r\n", 2);
-      n = write(sock, fileContents, fsize);
+      // printf("File size: %ld\n", fsize);
+ 
+      char *fileContents = (char *)malloc(sizeof(char) * (fsize));
+      bzero(fileContents, sizeof(fileContents));
+      int numberBytes = fread(fileContents, sizeof(char), fsize, f);
+      printf("Read # of bytes from file: %d\n", numberBytes);
+      printf("%x\n", fileContents);
+
+      strcat(response, "Connection: keep-alive\r\n");
+      // write(sock, "Connection: keep-alive\r\n", 24);
+      // Start response body
+      strcat(response, "\r\n");
+      printf("Length of header: %d\n", strlen(response));
+      // write(sock, "\r\n", 2);
+      
+      //strcat(response, fileContents);
+
+      // printf("Bytes written: %d\n", n);
+      // n = write(sock, fileContents, fsize);
+      // printf("==========================================\n");
+      printf("Response:\n%s\nTotal Response Length: %d\n\n\n", response, strlen(response));
+      n = write(sock, response, strlen(response));
+      printf("%d\n", n);
       if (n < 0) error("ERROR writing to socket");
-      write(sock, "Connection: close\r\n", 19);
-      write(sock, "\r\n", 2);
+      //write(sock, "Connection: close\r\n", 19);
+      //write(sock, "\r\n", 2);
+      
+      write(sock, fileContents, fsize);
+
+      // Cleanup
       free(fileContents);
       fclose(f);
    } else {
@@ -169,7 +192,7 @@ char* parseHTTP(char* url) {
         path = (char *) malloc(sizeof(char) * 13);
         path = "./file.html";
     }
-    printf("File: %s\n", path);
+    // printf("File: %s\n", path);
     return path;
 }
 

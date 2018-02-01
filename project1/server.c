@@ -98,18 +98,7 @@ void dostuff (int sock)
    if (n < 0) error("ERROR reading from socket");
    
    // Print out the HTTP request
-   printf("What is in my buffer fdfd %s\n", buffer);
-
-   // TODO: Parse HTTP Request
-   char * pch = (char *)strtok (buffer,"\n");
-   while (pch != NULL) {
-     // printf ("%s\n", pch);
-     // Parse file name
-     if (strstr(pch, "GET")) {
-       printf ("%s\n", pch);
-     }
-     pch = (char *)strtok (NULL, "\n");
-   }
+   printf("HTTP Request Message:\n%s\n", buffer);
 
    char * fileName = parseHTTP(buffer);
    
@@ -139,6 +128,8 @@ void dostuff (int sock)
       write(sock, "\r\n", 2);
       free(fileContents);
       fclose(f);
+   } else {
+      writeErrorResponse(sock);
    }
 }
 

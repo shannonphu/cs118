@@ -133,8 +133,7 @@ void dostuff (int sock)
       strcat(response, "\r\n");
       printf("Length of header: %d\n", strlen(response));
       // write(sock, "\r\n", 2);
-      
-      //strcat(response, fileContents);
+      strcat(response, fileContents);
 
       // printf("Bytes written: %d\n", n);
       // n = write(sock, fileContents, fsize);
@@ -146,8 +145,6 @@ void dostuff (int sock)
       //write(sock, "Connection: close\r\n", 19);
       //write(sock, "\r\n", 2);
       
-      write(sock, fileContents, fsize);
-
       // Cleanup
       free(fileContents);
       fclose(f);

@@ -142,12 +142,16 @@ void dostuff (int sock)
       write(sock, "Connection: close\r\n", 19);
       write(sock, "\r\n", 2);
       free(fileContents);
-      fclose(f);
+   } else {
+      printf("else\n");
+      writeErrorResponse(sock);
    }
+
+   fclose(f);
 }
 
 
-const char *errorHTML = "<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h3>Error: 404 Not Found</h3><p>The requested page does not exist or ran into an error.</p></body></html>";
+const char *errorHTML = "<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h3>Error: 404 Not Found</h3><p>The requested page does not exist or ran into an error.</p></body></html>\n";
 void writeErrorResponse(int sock) {
    write(sock, "HTTP/1.1 404 Not Found\r\n", 24);
    write(sock, "\r\n", 2);

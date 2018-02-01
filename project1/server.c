@@ -193,7 +193,7 @@ char* parseHTTP(char* url) {
 
 const char *errorHTML = "<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h3>Error: 404 Not Found</h3><p>The requested page does not exist or ran into an error.</p></body></html>";
 void writeErrorResponse(int sock) {
-   write(sock, "HTTP/1.1 404 Not Found\r\n", 24);
-   write(sock, "\r\n", 2);
-   write(sock, errorHTML, strlen(errorHTML));
+   char errorResponse[500];
+   sprintf(errorResponse, "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s\0", strlen(errorHTML), errorHTML);
+   write(sock, errorResponse, strlen(errorResponse));
 }

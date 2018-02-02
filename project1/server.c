@@ -18,7 +18,7 @@ void sigchld_handler(int s)
 int checkCorrectFile(const char* path);
 void dostuff(int); /* function prototype */
 void writeErrorResponse(int);
-char* parseHTTP(char*);
+char* parseHTTPRequest(char*);
 
 void error(char *msg)
 {
@@ -103,7 +103,7 @@ void dostuff (int sock)
    // Print out the HTTP request
    printf("HTTP Request Message:\n%s\n", buffer);
 
-   char * fileName = parseHTTP(buffer);
+   char *fileName = parseHTTPRequest(buffer);
 	
    if (checkCorrectFile(fileName) != 1) {
 	//NEED TO SEND A RESPOND TO THE CLIENT
@@ -136,58 +136,72 @@ void dostuff (int sock)
       write(sock, "Connection: close\r\n", 19);
       write(sock, "\r\n", 2);
       free(fileContents);
-      fclose(f);
    } else {
       writeErrorResponse(sock);
    }
+
+    free(fileName);
+    fclose(f);
 }
 
 int checkCorrectFile(const char* path) {
     struct stat st;
 
     if (stat(path, &st) < 0) 
-	return -1;
+	    return -1;
 
-     return S_ISREG(st.st_mode);
+    return S_ISREG(st.st_mode);
 }
 
-char* parseHTTP(char* url) {
-    //The string has to be at least 6 since we have GET / infront of it
-    if (strlen(url) < 6)
+// We want input to be of the format
+// GET /test%20file.html HTTP/1.1\n.....
+char* parseHTTPRequest(char* httpRequest) {
+    // Look for the beginning of the file path
+    char *requestPtr = strstr(httpRequest, "GET ");
+    // Not a proper GET HTTP request
+    if (requestPtr == NULL) {
         return NULL;
-
-    char *temp = (char *) malloc(sizeof(char) * 5);
-    temp[0] = url[0];
-    temp[1] = url[1];
-    temp[2] = url[2];
-    temp[3] = url[3];
-    temp[4] = url[4];
-
-    if (strcmp(temp, "GET /") != 0)
-	return NULL;
-
-    int count = 5;
-    while(url[count] != '\0' && url[count] != ' ') {
-        count++;
     }
-    char* path;
-    if (count != 5) {
-	path = (char *) malloc(sizeof(char) * (count - 2));
-        int position = 5;
-        path[0] = '.';
-        path[1] = '/';
-        while(url[position] != '\0' && url[position] != ' ') {
-            path[position-3] = url[position];
-            position++;
-        }
-        path[count - 2] = '\0';
+
+    // Point at the first character of the file path
+    char *pathBegin = requestPtr + 5;
+
+    // Look for the end of the file path
+    requestPtr = strstr(pathBegin, " HTTP/1.1\r\n");
+    // Not a proper GET HTTP request
+    if (requestPtr == NULL) {
+        return NULL;
     }
-    else {
-	//If there is no file, make file.html as a default file
-        path = (char *) malloc(sizeof(char) * 13);
-        path = "./file.html";
+
+    // Get index of space after file path
+    int pathLength = requestPtr - pathBegin;
+
+    // Parse out just the path name
+    char *path = malloc(pathLength + 1);
+    memcpy(path, pathBegin, pathLength);
+    path[pathLength] = '\0';
+
+    // Handle %20 spaces encoded in request
+    requestPtr = strstr(path, "%20");
+    while (requestPtr != NULL) {
+        char filteredPath[pathLength];
+        bzero(filteredPath, pathLength);
+
+        // Copy text before %20
+        memcpy(filteredPath, path, requestPtr - path);
+
+        // Add space to replace the %20
+        strcat(filteredPath, " ");
+
+        // Concatenate the rest of the string to path name
+        strcat(filteredPath, requestPtr + 3);
+
+        // Reset path to updated version of file name to continue the loop
+        strcpy(path, filteredPath);
+        requestPtr = strstr(path, "%20");
+        pathLength = strlen(path);
     }
-    printf("File: %s\n", path);
+
     return path;
 }
 

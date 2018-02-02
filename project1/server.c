@@ -148,9 +148,9 @@ int checkCorrectFile(const char* path) {
     struct stat st;
 
     if (stat(path, &st) < 0) 
-	return -1;
+	    return -1;
 
-     return S_ISREG(st.st_mode);
+    return S_ISREG(st.st_mode);
 }
 
 // We want input to be of the format
@@ -187,21 +187,19 @@ char* parseHTTPRequest(char* httpRequest) {
         char filteredPath[pathLength];
         bzero(filteredPath, pathLength);
 
-        printf("New Path: %s\n", path);
-        printf("New Request Path: %s\n", requestPtr);
-
+        // Copy text before %20
         memcpy(filteredPath, path, requestPtr - path);
-        printf("filteredPath 1: %s\n", filteredPath);
 
+        // Add space to replace the %20
         strcat(filteredPath, " ");
 
+        // Concatenate the rest of the string to path name
         strcat(filteredPath, requestPtr + 3);
-        printf("filteredPath 2: %s\n", filteredPath);
 
+        // Reset path to updated version of file name to continue the loop
         strcpy(path, filteredPath);
         requestPtr = strstr(path, "%20");
         pathLength = strlen(path);
-        printf("End Request Path: %s\n", requestPtr);
     }
 
     return path;

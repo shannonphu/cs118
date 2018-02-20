@@ -33,9 +33,20 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "ERROR, no port provided\n");
         exit(1);
     }
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    // SOCK_DGRAM is for an unreliable, connectionless UDP protocol
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0)
         error("ERROR opening socket");
+
+    /* setsockopt: Handy debugging trick that lets 
+     * us rerun the server immediately after we kill it; 
+     * otherwise we have to wait about 20 secs. 
+     * Eliminates "ERROR on binding: Address already in use" error. 
+    */
+    int optval = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(int));
+
     bzero((char *)&serv_addr, sizeof(serv_addr));
     portno = atoi(argv[1]);
     serv_addr.sin_family = AF_INET;
@@ -57,22 +68,21 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
+    char buf[1024];
+    int BUFSIZE = 1024;
     while (1) {
-        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-        
-        if (newsockfd < 0)
-            error("ERROR on accept");
-        
-        pid = fork();
-        if (pid < 0)
-            error("ERROR on fork");
-        
-        if (pid == 0) {
-            close(sockfd);
-            execution(newsockfd);
-            exit(0);
-        } else
-            close(newsockfd);
+        // receive a UDP datagram from a client
+        bzero(buf, BUFSIZE);
+        int n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &cli_addr, &clilen);
+        if (n < 0)
+            error("ERROR in recvfrom");
+
+        printf("server received %d/%d bytes: %s\n", strlen(buf), n, buf);
+
+        // echo the input back to the client 
+        n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr *) &cli_addr, clilen);
+        if (n < 0) 
+            error("ERROR in sendto");
     }
     return 0;
 }

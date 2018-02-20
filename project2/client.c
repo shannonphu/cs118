@@ -31,7 +31,9 @@ int main(int argc, char *argv[])
     }
     
     portno = atoi(argv[2]);
-    sockfd = socket(AF_INET, SOCK_STREAM, 0); //create a new socket
+
+    // SOCK_DGRAM is for an unreliable, connectionless UDP protocol
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0); //create a new socket
     if (sockfd < 0) 
         error("ERROR opening socket");
     

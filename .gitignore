@@ -1,4 +1,4 @@
 **/*.o
-project1/client
-project1/serverFork
+**/client
+**/server
 **/*.swp

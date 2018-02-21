@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     struct hostent *server;
 
-    char buffer[256];
+    char buffer[1024];
     if (argc < 4) {
        fprintf(stderr,"usage ./%s hostname port filename\n", argv[0]);
        exit(0);
@@ -57,8 +57,8 @@ int main(int argc, char *argv[])
     if (n < 0) 
          error("ERROR writing to socket");
     
-    bzero(buffer,256);
-    n = read(sockfd, buffer, 255);
+    bzero(buffer, 1024);
+    n = read(sockfd, buffer, 1024);
     if (n < 0) 
          error("ERROR reading from socket");
     printf("%s\n",buffer);

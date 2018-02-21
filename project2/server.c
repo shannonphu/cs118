@@ -9,19 +9,14 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-void sigchld_handler(int s) {
-    while (waitpid(-1, NULL, WNOHANG) > 0);
-}
 
+void sigchld_handler(int s);
+void error(char *msg);
 int checkCorrectFile(const char *path);
-void execution(int);
-void writeErrorResponse(int);
-char *parseHTTPRequest(char *);
+int getResponse(const char *fileName, char *response);
+void writeSocket(const int socket, struct sockaddr* socketAddress, socklen_t socketLength, const char *data);
+void writeErrorToSocket(const int socket, struct sockaddr* socketAddress, socklen_t socketLength);
 
-void error(char *msg) {
-    perror(msg);
-    exit(1);
-}
 
 int main(int argc, char *argv[]) {
     int sockfd, newsockfd, portno, pid;
@@ -68,94 +63,67 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
-    char buf[1024];
-    int BUFSIZE = 1024;
+    int BUFFER_SIZE = 1024;
+    char buffer[BUFFER_SIZE];    
     while (1) {
         // receive a UDP datagram from a client
-        bzero(buf, BUFSIZE);
-        int n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &cli_addr, &clilen);
+        bzero(buffer, BUFFER_SIZE);
+        int n = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen);
         if (n < 0)
             error("ERROR in recvfrom");
 
-        printf("server received %d/%d bytes: %s\n", strlen(buf), n, buf);
-
-        // echo the input back to the client 
-        n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr *) &cli_addr, clilen);
-        if (n < 0) 
-            error("ERROR in sendto");
+        printf("Server received %d/%d bytes: %s\n", BUFFER_SIZE, n, buffer);
+        char response[BUFFER_SIZE];
+        bzero(response, BUFFER_SIZE);
+        int status = getResponse(buffer, response);
+        if (status < 0) {
+            // writeErrorResponse(sockfd);
+            writeErrorToSocket(sockfd, &cli_addr, clilen);
+        }
+        writeSocket(sockfd, &cli_addr, clilen, response);
     }
     return 0;
 }
 
-void execution(int sock) {
-    int n;
-    char buffer[2048];
+void writeErrorToSocket(const int socket, 
+                struct sockaddr* socketAddress, 
+                socklen_t socketLength)
+{
+    writeSocket(socket, socketAddress, socketLength, "404: The requested file cannot be found or opened.");
+}
+
+void writeSocket(const int socket, 
+                struct sockaddr* socketAddress, 
+                socklen_t socketLength, 
+                const char *data) 
+{
+    int n = sendto(socket, data, strlen(data), 0, socketAddress, socketLength);
     
-    bzero(buffer, 2048);
-    n = read(sock, buffer, 2048);
-    if (n < 0)
-        error("ERROR reading from socket");
-    
-    // Print out the HTTP request
-    printf("HTTP Request Message:\n%s\n", buffer);
-    
-    char *fileName = parseHTTPRequest(buffer);
-    
+    if (n < 0) {
+        error("ERROR sending data to socket");
+    }
+}
+
+int getResponse(const char *fileName, char *fileContents) {    
     if (checkCorrectFile(fileName) != 1) {
-        writeErrorResponse(sock);
-        return;
+        return -1;
     }
     
-    // Open file if it exists and write the contents to the HTTP response
     FILE *f = fopen(fileName, "rb");
     if (f != NULL) {
-        char metadata[600];
-        bzero(metadata, 600);
-        
         fseek(f, 0, SEEK_END);
         long fsize = ftell(f);
         fseek(f, 0, SEEK_SET);
-        
-        write(sock, "HTTP/1.1 200 OK\r\n", 17);
-        sprintf(metadata, "Content-Length: %ld\r\n", fsize);
-        write(sock, metadata, strlen(metadata));
-        
-        char *fileContents = (char *)malloc(sizeof(char) * (fsize + 1));
-        bzero(fileContents, strlen(fileContents));
+
+        bzero(fileContents, fsize);
         int numberBytes = fread(fileContents, 1, fsize, f);
-        
-        write(sock, "Connection: keep-alive\r\n", 24);
-        
-        // Content-Type
-        char *contentType;
-        if (strrchr(fileName, '.') != NULL) {
-            char *fileExtension = strrchr(fileName, '.');
-            if (strcasecmp(fileExtension, ".jpeg") == 0 ||
-                strcasecmp(fileExtension, ".jpg") == 0) {
-                contentType = "Content-Type: image/jpeg\r\n\0";
-            } else if (strcasecmp(fileExtension, ".gif") == 0) {
-                contentType = "Content-Type: image/gif\r\n\0";
-            } else if (strcasecmp(fileExtension, ".html") == 0 ||
-                       strcasecmp(fileExtension, ".htm") == 0) {
-                contentType = "Content-Type: text/html\r\n\0";
-            }
-            
-            write(sock, contentType, strlen(contentType));
-        }
-        
-        write(sock, "\r\n", 2);
-        n = write(sock, fileContents, fsize);
-        if (n < 0)
-            error("ERROR writing to socket");
-        write(sock, "Connection: close\r\n", 19);
-        write(sock, "\r\n", 2);
-        free(fileContents);
+        if (numberBytes != fsize)
+            return -1;
+        fileContents[fsize] = '\0';
+        return 0;
     } else {
-        writeErrorResponse(sock);
+        return -1;
     }
-    
-    free(fileName);
-    fclose(f);
 }
 
 //Check if the user input a correct file format
@@ -168,67 +136,11 @@ int checkCorrectFile(const char *path) {
     return S_ISREG(st.st_mode);
 }
 
-// We want input to be of the format
-// GET /test%20file.html HTTP/1.1\n.....
-char *parseHTTPRequest(char *httpRequest) {
-    // Look for the beginning of the file path
-    char *requestPtr = strstr(httpRequest, "GET ");
-    // Not a proper GET HTTP request
-    if (requestPtr == NULL) {
-        return NULL;
-    }
-    
-    // Point at the first character of the file path
-    char *pathBegin = requestPtr + 5;
-    
-    // Look for the end of the file path
-    requestPtr = strstr(pathBegin, " HTTP/1.1\r\n");
-    // Not a proper GET HTTP request
-    if (requestPtr == NULL) {
-        return NULL;
-    }
-    
-    // Get index of space after file path
-    int pathLength = requestPtr - pathBegin;
-    
-    // Parse out just the path name
-    char *path = malloc(pathLength + 1);
-    memcpy(path, pathBegin, pathLength);
-    path[pathLength] = '\0';
-    
-    // Handle %20 spaces encoded in request
-    requestPtr = strstr(path, "%20");
-    while (requestPtr != NULL) {
-        char filteredPath[pathLength];
-        bzero(filteredPath, pathLength);
-        
-        // Copy text before %20
-        memcpy(filteredPath, path, requestPtr - path);
-        
-        // Add space to replace the %20
-        strcat(filteredPath, " ");
-        
-        // Concatenate the rest of the string to path name
-        strcat(filteredPath, requestPtr + 3);
-        
-        // Reset path to updated version of file name to continue the loop
-        strcpy(path, filteredPath);
-        requestPtr = strstr(path, "%20");
-        pathLength = strlen(path);
-    }
-    
-    return path;
+void error(char *msg) {
+    perror(msg);
+    exit(1);
 }
 
-//request response
-const char *errorHTML = "<!DOCTYPE html><html><head><title>404 Not "
-"Found</title></head><body><h3>Error: 404 Not "
-"Found</h3><p>The requested page does not exist or ran "
-"into an error.</p></body></html>";
-void writeErrorResponse(int sock) {
-    char errorResponse[500];
-    sprintf(errorResponse, "HTTP/1.1 404 Not Found\r\nContent-Type: "
-            "text/html\r\nContent-Length: %lu\r\n\r\n%s",
-            strlen(errorHTML), errorHTML);
-    write(sock, errorResponse, strlen(errorResponse));
+void sigchld_handler(int s) {
+    while (waitpid(-1, NULL, WNOHANG) > 0);
 }

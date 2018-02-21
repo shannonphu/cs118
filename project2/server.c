@@ -14,8 +14,8 @@ void sigchld_handler(int s);
 void error(char *msg);
 int checkCorrectFile(const char *path);
 int getResponse(const char *fileName, char *response);
-void writeSocket(const int socket, struct sockaddr* socketAddress, socklen_t socketLength, const char *data);
-void writeErrorToSocket(const int socket, struct sockaddr* socketAddress, socklen_t socketLength);
+void writeSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
+void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
 
 
 int main(int argc, char *argv[]) {
@@ -72,32 +72,32 @@ int main(int argc, char *argv[]) {
         if (n < 0)
             error("ERROR in recvfrom");
 
-        printf("Server received %d/%d bytes: %s\n", BUFFER_SIZE, n, buffer);
         char response[BUFFER_SIZE];
         bzero(response, BUFFER_SIZE);
         int status = getResponse(buffer, response);
         if (status < 0) {
-            // writeErrorResponse(sockfd);
             writeErrorToSocket(sockfd, &cli_addr, clilen);
         }
+
+        // Write file contents to client
         writeSocket(sockfd, &cli_addr, clilen, response);
     }
     return 0;
 }
 
 void writeErrorToSocket(const int socket, 
-                struct sockaddr* socketAddress, 
+                struct sockaddr_in* socketAddress, 
                 socklen_t socketLength)
 {
-    writeSocket(socket, socketAddress, socketLength, "404: The requested file cannot be found or opened.");
+    writeSocket(socket, (struct sockaddr *)socketAddress, socketLength, "404: The requested file cannot be found or opened.");
 }
 
 void writeSocket(const int socket, 
-                struct sockaddr* socketAddress, 
+                struct sockaddr_in* socketAddress, 
                 socklen_t socketLength, 
                 const char *data) 
 {
-    int n = sendto(socket, data, strlen(data), 0, socketAddress, socketLength);
+    int n = sendto(socket, data, strlen(data), 0, (struct sockaddr *)socketAddress, socketLength);
     
     if (n < 0) {
         error("ERROR sending data to socket");

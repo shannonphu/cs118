@@ -121,7 +121,7 @@ char* getResponse(const char *fileName) {
     if (f != NULL) {
         // Read file into response char array
         char *packet = response;
-        while(fread(packet, 1, MAX_PACKET_SIZE, f) == MAX_PACKET_SIZE) {
+        while(fread(packet, 1, MAX_PACKET_SIZE, f) > 0) {
             packet = packet + MAX_PACKET_SIZE;
         }
         fclose(f);

@@ -8,17 +8,19 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <math.h>
 
 
 void sigchld_handler(int s);
 void error(char *msg);
 int checkCorrectFile(const char *path);
-int getResponse(const char *fileName, char *response);
+char* getResponse(const char *fileName);
 void writeSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
 void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
 long getFileSize(const char *fileName);
 
 int WINDOW_SIZE = 5120;
+int MAX_PACKET_SIZE = 1024;
 
 int main(int argc, char *argv[]) {
     int sockfd, newsockfd, portno, pid;
@@ -73,11 +75,8 @@ int main(int argc, char *argv[]) {
         if (n < 0)
             error("ERROR in recvfrom");
 
-        char response[WINDOW_SIZE];
-        bzero(response, WINDOW_SIZE);
-        
-        int status = getResponse(buffer, response);
-        if (status < 0) {
+        char *response = getResponse(buffer);
+        if (response == NULL) {
             writeErrorToSocket(sockfd, &cli_addr, clilen);
         } else {
             // Write file contents to client
@@ -106,25 +105,29 @@ void writeSocket(const int socket,
     }
 }
 
-int getResponse(const char *fileName, char *fileContents) {    
+char* getResponse(const char *fileName) {    
     if (checkCorrectFile(fileName) != 1) {
-        return -1;
+        return NULL;
     }
+
+    // Allocate memory for a 1-D array to hold variable number of packets 
+    // and access packets using arithmetic
     long fsize = getFileSize(fileName);
+    int numPackets = ceil(fsize / (float)MAX_PACKET_SIZE);
+    char *response = malloc(numPackets * MAX_PACKET_SIZE);
+    bzero(response, sizeof(response));
 
     FILE *f = fopen(fileName, "rb");
     if (f != NULL) {
-        bzero(fileContents, fsize);
-        int numberBytes = fread(fileContents, 1, fsize, f);
-        if (numberBytes != fsize)
-            return -1;
-        fileContents[fsize] = '\0';
-        close(f);        
-        return 0;
-    } else {
-        return -1;
+        // Read file into response char array
+        char *packet = response;
+        while(fread(packet, 1, MAX_PACKET_SIZE, f) == MAX_PACKET_SIZE) {
+            packet = packet + MAX_PACKET_SIZE;
+        }
+        fclose(f);
     }
-
+    
+    return response;
 }
 
 long getFileSize(const char *fileName) {
@@ -133,7 +136,7 @@ long getFileSize(const char *fileName) {
         fseek(f, 0, SEEK_END);
         long fsize = ftell(f);
         fseek(f, 0, SEEK_SET);
-        close(f);
+        fclose(f);
 
         return fsize;
      } else {

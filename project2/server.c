@@ -17,6 +17,7 @@ int checkCorrectFile(const char *path);
 char* getResponse(const char *fileName);
 void writeSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
 void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
+int getNumberPacketsForSize(long size);
 long getFileSize(const char *fileName);
 
 int WINDOW_SIZE = 5120;
@@ -79,8 +80,17 @@ int main(int argc, char *argv[]) {
         if (response == NULL) {
             writeErrorToSocket(sockfd, &cli_addr, clilen);
         } else {
-            // Write file contents to client
-            writeSocket(sockfd, &cli_addr, clilen, response);
+            // Send each packet to client
+            // fprintf(stderr, "%s\n", response);            
+            int numPackets = getNumberPacketsForSize(strlen(response));
+            char *packetPtr = response;
+            for (int i = 0; i < numPackets; i++) {
+                char packet[MAX_PACKET_SIZE];
+                bzero(packet, MAX_PACKET_SIZE);
+                memcpy(packet, packetPtr, MAX_PACKET_SIZE);
+                writeSocket(sockfd, &cli_addr, clilen, packet);
+                packetPtr += MAX_PACKET_SIZE;
+            }
         }
     }
     return 0;
@@ -113,9 +123,9 @@ char* getResponse(const char *fileName) {
     // Allocate memory for a 1-D array to hold variable number of packets 
     // and access packets using arithmetic
     long fsize = getFileSize(fileName);
-    int numPackets = ceil(fsize / (float)MAX_PACKET_SIZE);
+    int numPackets = getNumberPacketsForSize(fsize);
     char *response = malloc(numPackets * MAX_PACKET_SIZE);
-    bzero(response, sizeof(response));
+    bzero(response, strlen(response));
 
     FILE *f = fopen(fileName, "rb");
     if (f != NULL) {
@@ -128,6 +138,10 @@ char* getResponse(const char *fileName) {
     }
     
     return response;
+}
+
+int getNumberPacketsForSize(long size) {
+    return ceil(size / (float)MAX_PACKET_SIZE);
 }
 
 long getFileSize(const char *fileName) {

@@ -16,7 +16,9 @@ int checkCorrectFile(const char *path);
 int getResponse(const char *fileName, char *response);
 void writeSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
 void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
+long getFileSize(const char *fileName);
 
+int WINDOW_SIZE = 5120;
 
 int main(int argc, char *argv[]) {
     int sockfd, newsockfd, portno, pid;
@@ -63,24 +65,24 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
-    int BUFFER_SIZE = 1024;
-    char buffer[BUFFER_SIZE];    
+    char buffer[WINDOW_SIZE];    
     while (1) {
         // receive a UDP datagram from a client
-        bzero(buffer, BUFFER_SIZE);
-        int n = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen);
+        bzero(buffer, WINDOW_SIZE);
+        int n = recvfrom(sockfd, buffer, WINDOW_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen);
         if (n < 0)
             error("ERROR in recvfrom");
 
-        char response[BUFFER_SIZE];
-        bzero(response, BUFFER_SIZE);
+        char response[WINDOW_SIZE];
+        bzero(response, WINDOW_SIZE);
+        
         int status = getResponse(buffer, response);
         if (status < 0) {
             writeErrorToSocket(sockfd, &cli_addr, clilen);
+        } else {
+            // Write file contents to client
+            writeSocket(sockfd, &cli_addr, clilen, response);
         }
-
-        // Write file contents to client
-        writeSocket(sockfd, &cli_addr, clilen, response);
     }
     return 0;
 }
@@ -108,22 +110,35 @@ int getResponse(const char *fileName, char *fileContents) {
     if (checkCorrectFile(fileName) != 1) {
         return -1;
     }
-    
+    long fsize = getFileSize(fileName);
+
     FILE *f = fopen(fileName, "rb");
     if (f != NULL) {
-        fseek(f, 0, SEEK_END);
-        long fsize = ftell(f);
-        fseek(f, 0, SEEK_SET);
-
         bzero(fileContents, fsize);
         int numberBytes = fread(fileContents, 1, fsize, f);
         if (numberBytes != fsize)
             return -1;
         fileContents[fsize] = '\0';
+        close(f);        
         return 0;
     } else {
         return -1;
     }
+
+}
+
+long getFileSize(const char *fileName) {
+    FILE *f = fopen(fileName, "rb");
+     if (f != NULL) {
+        fseek(f, 0, SEEK_END);
+        long fsize = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        close(f);
+
+        return fsize;
+     } else {
+         return -1;
+     }
 }
 
 //Check if the user input a correct file format

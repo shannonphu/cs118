@@ -25,7 +25,6 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     struct hostent *server;
 
-    char buffer[1024];
     if (argc < 4) {
        fprintf(stderr,"usage ./%s hostname port filename\n", argv[0]);
        exit(0);
@@ -53,17 +52,24 @@ int main(int argc, char *argv[])
     if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0)
         error("ERROR connecting");
     
+    // Send request
     n = write(sockfd, filename, MAX_PACKET_SIZE);
     if (n < 0) 
          error("ERROR writing to socket");
     
-    bzero(buffer, 1024);
-    n = read(sockfd, buffer, 1024);
-    if (n < 0) 
-         error("ERROR reading from socket");
-    printf("%s\n",buffer);
+    // Loop waiting for full response
+    char buffer[MAX_PACKET_SIZE + 1];  
+    while (1) {
+        bzero(buffer, MAX_PACKET_SIZE);
+        n = read(sockfd, buffer, MAX_PACKET_SIZE);
+
+        if (n < 0) {
+            error("ERROR reading from socket");
+        } 
+        buffer[MAX_PACKET_SIZE] = '\0';
+        printf("%s\n\n", buffer);
+    }
     
     close(sockfd);
-    
     return 0;
 }

@@ -62,10 +62,8 @@ int main(int argc, char *argv[])
 
     buffer[MAX_PACKET_SIZE] = '\0';
 
-    for (int i = 0; i < MAX_PACKET_SIZE; ++i) {
-        printf("%02x ", buffer[i]);
-    }
-    printf("\n\n");
+    struct Packet packet;
+    bytesToPacket(&packet, buffer);
     
     close(sockfd);
     return 0;

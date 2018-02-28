@@ -118,7 +118,7 @@ void writePacketSocket(const int socket,
                 socklen_t socketLength, 
                 const char *data) 
 {
-    int n = sendto(socket, data, strlen(data), 0, (struct sockaddr *)socketAddress, socketLength);
+    int n = sendto(socket, data, MAX_PACKET_SIZE, 0, (struct sockaddr *)socketAddress, socketLength);
 
     if (n < 0) {
         error("ERROR sending data to socket");

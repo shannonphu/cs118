@@ -79,18 +79,26 @@ int main(int argc, char *argv[]) {
         if (response == NULL) {
             writeErrorToSocket(sockfd, &cli_addr, clilen);
         } else {
-            // Send each packet to client         
-            int numPackets = getNumberPacketsForSize(sizeof(response));
-            struct Packet *packetPtr = response;
+            // Send each packet to client
+            long fsize = getFileSize(buffer);
+            int numPackets = getNumberPacketsForSize(fsize);
+
             for (int i = 0; i < numPackets; i++) {
+                struct Packet *packetPtr = response[i];
+
                 // Make packet to write
                 char packet[MAX_PACKET_SIZE];
                 bzero(packet, MAX_PACKET_SIZE);
-                // TODO: Convert struct Packet to char * for sending over network
-                memcpy(packet, packetPtr, MAX_PACKET_SIZE);
-                packetPtr += 1;
 
-                writePacketSocket(sockfd, &cli_addr, clilen, packet);
+                packetToBytes(packetPtr, &packet);
+
+                fprintf(stderr, "%s\n", packet + 12);
+
+                writePacketSocket(sockfd, &cli_addr, clilen, &packet);
+                for (int i = 0; i < MAX_PACKET_SIZE; ++i) {
+                    printf("%02x ", packet[i]);
+                }
+                printf("\n\n");
             }
         }
     }
@@ -136,7 +144,7 @@ struct Packet** getPacketsResponse(const char *fileName) {
             bzero(payloadTemp, PAYLOAD_SIZE + 1);
             fread(payloadTemp, 1, PAYLOAD_SIZE, f);
             packets[i] = initPacket(payloadTemp);
-            fprintf(stderr, "%s", packets[i]->payload);
+            // fprintf(stderr, "%s", packets[i]->payload);
         }
         fclose(f);
     }

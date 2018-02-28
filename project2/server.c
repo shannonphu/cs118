@@ -15,7 +15,7 @@
 
 void sigchld_handler(int s);
 int checkCorrectFile(const char *path);
-char* getResponse(const char *fileName);
+struct Packet** getPacketsResponse(const char *fileName);
 void writePacketSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
 void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
 int getNumberPacketsForSize(long size);
@@ -75,19 +75,20 @@ int main(int argc, char *argv[]) {
         if (n < 0)
             error("ERROR in recvfrom");
 
-        char *response = getResponse(buffer);
+        struct Packet **response = getPacketsResponse(buffer);
         if (response == NULL) {
             writeErrorToSocket(sockfd, &cli_addr, clilen);
         } else {
             // Send each packet to client         
-            int numPackets = getNumberPacketsForSize(strlen(response));
-            char *packetPtr = response;
+            int numPackets = getNumberPacketsForSize(sizeof(response));
+            struct Packet *packetPtr = response;
             for (int i = 0; i < numPackets; i++) {
                 // Make packet to write
                 char packet[MAX_PACKET_SIZE];
                 bzero(packet, MAX_PACKET_SIZE);
+                // TODO: Convert struct Packet to char * for sending over network
                 memcpy(packet, packetPtr, MAX_PACKET_SIZE);
-                packetPtr += MAX_PACKET_SIZE;
+                packetPtr += 1;
 
                 writePacketSocket(sockfd, &cli_addr, clilen, packet);
             }
@@ -116,33 +117,35 @@ void writePacketSocket(const int socket,
     }
 }
 
-char* getResponse(const char *fileName) {    
+struct Packet** getPacketsResponse(const char *fileName) {    
     if (checkCorrectFile(fileName) != 1) {
         return NULL;
     }
 
-    // Allocate memory for a 1-D array to hold variable number of packets 
-    // and access packets using arithmetic
+    // Make array of pointers to Packet structs which hold the header and 
+    // payload of response packets
     long fsize = getFileSize(fileName);
     int numPackets = getNumberPacketsForSize(fsize);
-    char *response = malloc(numPackets * MAX_PACKET_SIZE);
-    bzero(response, strlen(response));
+    struct Packet **packets = malloc(numPackets * sizeof(struct Packet *));
 
     FILE *f = fopen(fileName, "rb");
     if (f != NULL) {
-        // Read file into response char array
-        char *packet = response;
-        while(fread(packet, 1, MAX_PACKET_SIZE, f) > 0) {
-            packet = packet + MAX_PACKET_SIZE;
+        // Read file into packets array
+        char payloadTemp[PAYLOAD_SIZE + 1];
+        for (int i = 0; i < numPackets; i++) {
+            bzero(payloadTemp, PAYLOAD_SIZE + 1);
+            fread(payloadTemp, 1, PAYLOAD_SIZE, f);
+            packets[i] = initPacket(payloadTemp);
+            fprintf(stderr, "%s", packets[i]->payload);
         }
         fclose(f);
     }
     
-    return response;
+    return packets;
 }
 
 int getNumberPacketsForSize(long size) {
-    return ceil(size / (float)MAX_PACKET_SIZE);
+    return ceil(size / (float)PAYLOAD_SIZE);
 }
 
 long getFileSize(const char *fileName) {

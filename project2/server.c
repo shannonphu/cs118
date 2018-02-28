@@ -10,9 +10,10 @@
 #include <signal.h>
 #include <math.h>
 
+#include "util.h"
+
 
 void sigchld_handler(int s);
-void error(char *msg);
 int checkCorrectFile(const char *path);
 char* getResponse(const char *fileName);
 void writePacketSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
@@ -20,8 +21,6 @@ void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, soc
 int getNumberPacketsForSize(long size);
 long getFileSize(const char *fileName);
 
-int WINDOW_SIZE = 5120;
-int MAX_PACKET_SIZE = 1024;
 
 int main(int argc, char *argv[]) {
     int sockfd, newsockfd, portno, pid;
@@ -168,11 +167,6 @@ int checkCorrectFile(const char *path) {
         return -1;
     
     return S_ISREG(st.st_mode);
-}
-
-void error(char *msg) {
-    perror(msg);
-    exit(1);
 }
 
 void sigchld_handler(int s) {

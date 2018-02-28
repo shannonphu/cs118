@@ -10,13 +10,7 @@
 #include <stdlib.h>
 #include <strings.h>
 
-int MAX_PACKET_SIZE = 1024;
-
-void error(char *msg)
-{
-    perror(msg);
-    exit(0);
-}
+#include "util.h"
 
 int main(int argc, char *argv[])
 {

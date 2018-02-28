@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     if (sockfd < 0) 
         error("ERROR opening socket");
     
-    server = gethostbyname(argv[1]); //takes a string like "www.yahoo.com", and returns a struct hostent which contains information, as IP address, address type, the length of the addresses...
+    server = gethostbyname(argv[1]);
     if (server == NULL) {
         fprintf(stderr,"ERROR, no such host\n");
         exit(0);
@@ -50,20 +50,32 @@ int main(int argc, char *argv[])
         error("ERROR writing to socket");
     }
 
+    // Setup select
+    fd_set sockets;
+    FD_ZERO(&sockets);
+    FD_SET(sockfd, &sockets);
 
     // Loop waiting for full response
     char buffer[MAX_PACKET_SIZE + 1];  
-    bzero(buffer, MAX_PACKET_SIZE + 1);
+    while (1) {
+        int selectResult = select(sockfd + 1, &sockets, NULL, NULL, NULL);
+        if (selectResult < 0) {
+            error("Select error");
+        }
 
-    n = recvfrom(sockfd, buffer, MAX_PACKET_SIZE, 0, &serv_addr, &serverlen);
-    if (n < 0) {
-        error("ERROR reading from socket");
-    } 
+        if (FD_ISSET(sockfd, &sockets)) {
+            bzero(buffer, MAX_PACKET_SIZE + 1);
 
-    buffer[MAX_PACKET_SIZE] = '\0';
+            n = recvfrom(sockfd, buffer, MAX_PACKET_SIZE, 0, &serv_addr, &serverlen);
+            if (n < 0) {
+                error("ERROR reading from socket");
+            } 
 
-    struct Packet packet;
-    bytesToPacket(&packet, buffer);
+            struct Packet packet;
+            bytesToPacket(&packet, buffer);
+            printf("%s\n", packet.payload);
+        }
+    }
     
     close(sockfd);
     return 0;

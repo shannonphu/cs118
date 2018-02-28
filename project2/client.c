@@ -15,7 +15,7 @@
 int main(int argc, char *argv[])
 {
     int sockfd;
-    int portno, n;
+    int portno;
     struct sockaddr_in serv_addr;
     struct hostent *server;
 
@@ -43,26 +43,29 @@ int main(int argc, char *argv[])
     bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
     serv_addr.sin_port = htons(portno);
     
-    if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0)
-        error("ERROR connecting");
-    
-    // Send request
-    n = write(sockfd, filename, MAX_PACKET_SIZE);
-    if (n < 0) 
-         error("ERROR writing to socket");
-    
+    // Send request    
+    socklen_t serverlen = sizeof(serv_addr);
+    int n = sendto(sockfd, filename, strlen(filename), 0, (struct sockaddr *)&serv_addr, serverlen);
+    if (n < 0) {
+        error("ERROR writing to socket");
+    }
+
+
     // Loop waiting for full response
     char buffer[MAX_PACKET_SIZE + 1];  
-    while (1) {
-        bzero(buffer, MAX_PACKET_SIZE);
-        n = read(sockfd, buffer, MAX_PACKET_SIZE);
+    bzero(buffer, MAX_PACKET_SIZE + 1);
 
-        if (n < 0) {
-            error("ERROR reading from socket");
-        } 
-        buffer[MAX_PACKET_SIZE] = '\0';
-        printf("%s\n\n", buffer);
+    n = recvfrom(sockfd, buffer, MAX_PACKET_SIZE, 0, &serv_addr, &serverlen);
+    if (n < 0) {
+        error("ERROR reading from socket");
+    } 
+
+    buffer[MAX_PACKET_SIZE] = '\0';
+
+    for (int i = 0; i < MAX_PACKET_SIZE; ++i) {
+        printf("%02x ", buffer[i]);
     }
+    printf("\n\n");
     
     close(sockfd);
     return 0;

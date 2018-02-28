@@ -15,7 +15,7 @@ void sigchld_handler(int s);
 void error(char *msg);
 int checkCorrectFile(const char *path);
 char* getResponse(const char *fileName);
-void writeSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
+void writePacketSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
 void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
 int getNumberPacketsForSize(long size);
 long getFileSize(const char *fileName);
@@ -80,16 +80,17 @@ int main(int argc, char *argv[]) {
         if (response == NULL) {
             writeErrorToSocket(sockfd, &cli_addr, clilen);
         } else {
-            // Send each packet to client
-            // fprintf(stderr, "%s\n", response);            
+            // Send each packet to client         
             int numPackets = getNumberPacketsForSize(strlen(response));
             char *packetPtr = response;
             for (int i = 0; i < numPackets; i++) {
+                // Make packet to write
                 char packet[MAX_PACKET_SIZE];
                 bzero(packet, MAX_PACKET_SIZE);
                 memcpy(packet, packetPtr, MAX_PACKET_SIZE);
-                writeSocket(sockfd, &cli_addr, clilen, packet);
                 packetPtr += MAX_PACKET_SIZE;
+
+                writePacketSocket(sockfd, &cli_addr, clilen, packet);
             }
         }
     }
@@ -100,16 +101,17 @@ void writeErrorToSocket(const int socket,
                 struct sockaddr_in* socketAddress, 
                 socklen_t socketLength)
 {
-    writeSocket(socket, (struct sockaddr *)socketAddress, socketLength, "404: The requested file cannot be found or opened.");
+    writePacketSocket(socket, (struct sockaddr *)socketAddress, socketLength, "404: The requested file cannot be found or opened.");
 }
 
-void writeSocket(const int socket, 
+// Writes MAX_PACKET_SIZE amount in bytes from data to socket.
+void writePacketSocket(const int socket, 
                 struct sockaddr_in* socketAddress, 
                 socklen_t socketLength, 
                 const char *data) 
 {
     int n = sendto(socket, data, strlen(data), 0, (struct sockaddr *)socketAddress, socketLength);
-    
+
     if (n < 0) {
         error("ERROR sending data to socket");
     }

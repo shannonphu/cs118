@@ -90,11 +90,11 @@ int main(int argc, char *argv[]) {
                 char packet[MAX_PACKET_SIZE];
                 bzero(packet, MAX_PACKET_SIZE);
 
-                packetToBytes(packetPtr, &packet);
+                packetToBytes(packetPtr, packet);
 
                 fprintf(stderr, "%s\n", packet + 12);
 
-                writePacketSocket(sockfd, &cli_addr, clilen, &packet);
+                writePacketSocket(sockfd, &cli_addr, clilen, packet);
                 for (int i = 0; i < MAX_PACKET_SIZE; ++i) {
                     printf("%02x ", packet[i]);
                 }
@@ -109,7 +109,7 @@ void writeErrorToSocket(const int socket,
                 struct sockaddr_in* socketAddress, 
                 socklen_t socketLength)
 {
-    writePacketSocket(socket, (struct sockaddr *)socketAddress, socketLength, "404: The requested file cannot be found or opened.");
+    writePacketSocket(socket, (struct sockaddr_in *)socketAddress, socketLength, "404: The requested file cannot be found or opened.");
 }
 
 // Writes MAX_PACKET_SIZE amount in bytes from data to socket.

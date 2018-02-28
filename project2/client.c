@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <unistd.h>
 
 #include "util.h"
 

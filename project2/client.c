@@ -42,15 +42,25 @@ int main(int argc, char *argv[])
     bzero((char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET; //initialize server's address
     bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
-    serv_addr.sin_port = htons(portno);
-    
-    // Send request    
+    serv_addr.sin_port = htons(portno);    
     socklen_t serverlen = sizeof(serv_addr);
-    int n = sendto(sockfd, filename, strlen(filename), 0, (struct sockaddr *)&serv_addr, serverlen);
+
+    // Send file request packet
+    struct Packet *requestPacket = initPacket(filename, -1, -1, SYN);
+    char request[MAX_PACKET_SIZE];
+    bzero(request, MAX_PACKET_SIZE);
+    packetToBytes(requestPacket, request);
+    int n = sendto(sockfd, request, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, serverlen);
     if (n < 0) {
         error("ERROR writing to socket");
     }
 
+    // Setup file to write response to
+    // FILE *fp = fopen("received.data", "w");
+	// if (fp == NULL) {
+		// error("Error opening file for writing");
+    // }
+    
     // Setup select
     fd_set sockets;
     FD_ZERO(&sockets);
@@ -74,15 +84,21 @@ int main(int argc, char *argv[])
 
             struct Packet packet;
             bytesToPacket(&packet, buffer);
-
+            
             if (packet.flag == FIN) {
+                // fclose(fp);
+                close(sockfd);                
                 break;
             }
 
+            // n = fwrite(packet.payload, sizeof(char), PAYLOAD_SIZE, fp);
+            // if (n < 0) {
+                // error("Error writing to received.data");
+            // }
             printf("%s\n", packet.payload);
         }
     }
     
-    close(sockfd);
+    // fclose(fp);
     return 0;
 }

@@ -93,6 +93,7 @@ int main(int argc, char *argv[])
                 // Send an ACK for received packets with payload
                 struct Packet ackPacket;
                 ackPacket.flag = ACK;
+                ackPacket.sequenceNum = -1;
                 ackPacket.ackNum = packet.sequenceNum;
                 packetToBytes(&ackPacket, buffer);
                 n = sendto(sockfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, serverlen);

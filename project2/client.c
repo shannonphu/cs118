@@ -89,13 +89,22 @@ int main(int argc, char *argv[])
                 // fclose(fp);
                 close(sockfd);                
                 break;
+            } else if (packet.flag == NONE) {
+                // Send an ACK for received packets with payload
+                struct Packet ackPacket;
+                ackPacket.flag = ACK;
+                ackPacket.ackNum = packet.sequenceNum;
+                packetToBytes(&ackPacket, buffer);
+                n = sendto(sockfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, serverlen);
+                if (n < 0) {
+                    error("ERROR writing to socket");
+                }
             }
 
             // n = fwrite(packet.payload, sizeof(char), PAYLOAD_SIZE, fp);
             // if (n < 0) {
                 // error("Error writing to received.data");
             // }
-            printf("%s\n", packet.payload);
         }
     }
     

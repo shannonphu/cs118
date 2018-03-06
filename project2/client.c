@@ -74,6 +74,11 @@ int main(int argc, char *argv[])
 
             struct Packet packet;
             bytesToPacket(&packet, buffer);
+
+            if (packet.flag == FIN) {
+                break;
+            }
+
             printf("%s\n", packet.payload);
         }
     }

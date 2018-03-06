@@ -17,7 +17,7 @@ struct Packet
     char payload[PAYLOAD_SIZE + 1];
 };
 
-struct Packet* initPacket(const char *data);
+struct Packet* initPacket(const char *data, int sequenceNum, int ackNum, enum Flag flag);
 
 void destructPacket(struct Packet *packet);
 

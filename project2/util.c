@@ -10,11 +10,11 @@ void error(char *msg) {
     exit(1);
 }
 
-struct Packet* initPacket(const char *data) {
+struct Packet* initPacket(const char *data, int sequenceNum, int ackNum, enum Flag flag) {
     struct Packet *newPacket = malloc(sizeof(struct Packet));
-    newPacket->sequenceNum = 2;
-    newPacket->ackNum = 1;
-    newPacket->flag = SYN;
+    newPacket->sequenceNum = sequenceNum;
+    newPacket->ackNum = ackNum;
+    newPacket->flag = flag;
     bzero(newPacket->payload, PAYLOAD_SIZE + 1);
     memcpy(newPacket->payload, data, PAYLOAD_SIZE);
     newPacket->payload[PAYLOAD_SIZE] = '\0';

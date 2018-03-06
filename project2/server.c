@@ -81,7 +81,8 @@ int main(int argc, char *argv[]) {
         } else {
             // Send each packet to client
             long fsize = getFileSize(buffer);
-            int numPackets = getNumberPacketsForSize(fsize);
+            // Add 1 to number of packets for FIN packet
+            int numPackets = getNumberPacketsForSize(fsize) + 1;
 
             for (int i = 0; i < numPackets; i++) {
                 struct Packet *packetPtr = response[i];
@@ -134,7 +135,8 @@ struct Packet** getPacketsResponse(const char *fileName) {
     // payload of response packets
     long fsize = getFileSize(fileName);
     int numPackets = getNumberPacketsForSize(fsize);
-    struct Packet **packets = malloc(numPackets * sizeof(struct Packet *));
+    // Add 1 to number of packets for FIN packet
+    struct Packet **packets = malloc((numPackets + 1) * sizeof(struct Packet *));
 
     FILE *f = fopen(fileName, "rb");
     if (f != NULL) {
@@ -143,9 +145,9 @@ struct Packet** getPacketsResponse(const char *fileName) {
         for (int i = 0; i < numPackets; i++) {
             bzero(payloadTemp, PAYLOAD_SIZE + 1);
             fread(payloadTemp, 1, PAYLOAD_SIZE, f);
-            packets[i] = initPacket(payloadTemp);
-            // fprintf(stderr, "%s", packets[i]->payload);
+            packets[i] = initPacket(payloadTemp, -1, -1, -1);
         }
+        packets[numPackets] = initPacket("\0", -1, -1, FIN);
         fclose(f);
     }
     

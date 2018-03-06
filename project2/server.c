@@ -70,6 +70,7 @@ int main(int argc, char *argv[]) {
     char buffer[WINDOW_SIZE];
     int windowLeftBound;
     int windowRightBound;
+    int maxWindowRightBound;
     struct Packet **response = NULL;
     while (1) {
         // receive a UDP datagram from a client
@@ -88,25 +89,39 @@ int main(int argc, char *argv[]) {
             // Reset congestion window bounds
             windowLeftBound = 0;
             windowRightBound = WINDOW_SIZE;
+            long fsize = getFileSize(clientPacket.payload);
+            // Add 1 to number of packets for FIN packet            
+            int numPackets = getNumberPacketsForSize(fsize) + 1;
+            maxWindowRightBound = numPackets * MAX_PACKET_SIZE;
 
             response = getPacketsResponse(clientPacket.payload);
             if (response == NULL) {
                 writeErrorToSocket(sockfd, &cli_addr, clilen);
             }
+        } else if (clientPacket.flag == ACK) {
+            printf("Received ACK for packet %d\n", clientPacket.ackNum);
+            if (clientPacket.ackNum == windowLeftBound) {
+                windowLeftBound += MAX_PACKET_SIZE;
+                windowRightBound += MAX_PACKET_SIZE;
+            }      
         }
 
         // Send each packet to client from window
-        for (int i = windowLeftBound; i < windowLeftBound + WINDOW_SIZE; i += MAX_PACKET_SIZE) {
+        for (int i = windowLeftBound; i < windowLeftBound + WINDOW_SIZE && i < maxWindowRightBound; i += MAX_PACKET_SIZE) {
             int index = i / MAX_PACKET_SIZE;
-            printf("%d\n", index);
             struct Packet *packetPtr = response[index];
+
+            if (packetPtr->sent) {
+                continue;
+            }
 
             // Make packet to write
             char packet[MAX_PACKET_SIZE];
             bzero(packet, MAX_PACKET_SIZE);
             packetToBytes(packetPtr, packet);
             writePacketSocket(sockfd, &cli_addr, clilen, packet);
-            fprintf(stderr, "%s\n", packet + 12);                    
+            packetPtr->sent = 1;
+            printf("Sent packet w/ seqNum %d\n", packetPtr->sequenceNum);                
         }
     }
     return 0;
@@ -151,9 +166,9 @@ struct Packet** getPacketsResponse(const char *fileName) {
         for (int i = 0; i < numPackets; i++) {
             bzero(payloadTemp, PAYLOAD_SIZE + 1);
             fread(payloadTemp, 1, PAYLOAD_SIZE, f);
-            packets[i] = initPacket(payloadTemp, -1, -1, NONE);
+            packets[i] = initPacket(payloadTemp, i * MAX_PACKET_SIZE, -1, NONE);
         }
-        packets[numPackets] = initPacket("\0", -1, -1, FIN);
+        packets[numPackets] = initPacket("\0", numPackets * MAX_PACKET_SIZE, -1, FIN);
         fclose(f);
     } else {
         return NULL;

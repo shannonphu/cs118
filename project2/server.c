@@ -149,6 +149,8 @@ struct Packet** getPacketsResponse(const char *fileName) {
         }
         packets[numPackets] = initPacket("\0", -1, -1, FIN);
         fclose(f);
+    } else {
+        return NULL;
     }
     
     return packets;

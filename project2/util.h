@@ -15,6 +15,7 @@ struct Packet
     int ackNum;
     enum Flag flag;
     char payload[PAYLOAD_SIZE + 1];
+    int sent;
 };
 
 struct Packet* initPacket(const char *data, int sequenceNum, int ackNum, enum Flag flag);

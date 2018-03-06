@@ -18,6 +18,7 @@ struct Packet* initPacket(const char *data, int sequenceNum, int ackNum, enum Fl
     bzero(newPacket->payload, PAYLOAD_SIZE + 1);
     memcpy(newPacket->payload, data, PAYLOAD_SIZE);
     newPacket->payload[PAYLOAD_SIZE] = '\0';
+    newPacket->sent = 0;
     return newPacket;
 }
 
@@ -33,11 +34,8 @@ void packetToBytes(const struct Packet *packet, char *byteArray) {
 }
 
 void bytesToPacket(struct Packet *packet, const char *byteArray) {
-    int sequenceNum = *byteArray;
-    packet->sequenceNum = sequenceNum;
-    int ackNum = *(byteArray + sizeof(packet->sequenceNum));
-    packet->ackNum = ackNum;
-    enum Flag flag = *(byteArray + sizeof(packet->sequenceNum) + sizeof(packet->ackNum));
-    packet->flag = flag;
+    memcpy(&(packet->sequenceNum), byteArray, sizeof(packet->sequenceNum));
+    memcpy(&(packet->ackNum), byteArray + sizeof(packet->sequenceNum), sizeof(packet->ackNum));
+    memcpy(&(packet->flag), byteArray + sizeof(packet->sequenceNum) + sizeof(packet->ackNum), sizeof(packet->flag));
     strcpy(packet->payload, byteArray + sizeof(packet->sequenceNum) + sizeof(packet->ackNum) + sizeof(packet->flag));
 }

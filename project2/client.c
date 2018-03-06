@@ -84,6 +84,7 @@ int main(int argc, char *argv[])
 
             struct Packet packet;
             bytesToPacket(&packet, buffer);
+            printf("Received packet %d\n", packet.sequenceNum);
             
             if (packet.flag == FIN) {
                 // fclose(fp);
@@ -97,6 +98,7 @@ int main(int argc, char *argv[])
                 ackPacket.ackNum = packet.sequenceNum;
                 packetToBytes(&ackPacket, buffer);
                 n = sendto(sockfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, serverlen);
+                printf("Sent ACK for packet %d\n", ackPacket.ackNum);
                 if (n < 0) {
                     error("ERROR writing to socket");
                 }

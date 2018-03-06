@@ -6,7 +6,7 @@ static const int MAX_PACKET_SIZE = 1024;
 
 void error(char *msg);
 
-enum Flag { RETRANSMISSION, SYN, FIN };
+enum Flag { NONE, RETRANSMISSION, SYN, FIN, SYN_ACK, ACK };
 static const int PAYLOAD_SIZE = MAX_PACKET_SIZE - 2 * sizeof(int) - sizeof(enum Flag);
 
 struct Packet

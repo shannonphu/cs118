@@ -67,40 +67,46 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
-    char buffer[WINDOW_SIZE];    
+    char buffer[WINDOW_SIZE];
+    int windowLeftBound;
+    int windowRightBound;
+    struct Packet **response = NULL;
     while (1) {
         // receive a UDP datagram from a client
         bzero(buffer, WINDOW_SIZE);
         int n = recvfrom(sockfd, buffer, WINDOW_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen);
-        if (n < 0)
+        if (n < 0) {
             error("ERROR in recvfrom");
+        }
 
-        struct Packet **response = getPacketsResponse(buffer);
-        if (response == NULL) {
-            writeErrorToSocket(sockfd, &cli_addr, clilen);
-        } else {
-            // Send each packet to client
-            long fsize = getFileSize(buffer);
-            // Add 1 to number of packets for FIN packet
-            int numPackets = getNumberPacketsForSize(fsize) + 1;
+        // Convert received packet from client into Packet struct
+        struct Packet clientPacket;
+        bytesToPacket(&clientPacket, buffer);
 
-            for (int i = 0; i < numPackets; i++) {
-                struct Packet *packetPtr = response[i];
+        // Received file request
+        if (clientPacket.flag == SYN) {
+            // Reset congestion window bounds
+            windowLeftBound = 0;
+            windowRightBound = WINDOW_SIZE;
 
-                // Make packet to write
-                char packet[MAX_PACKET_SIZE];
-                bzero(packet, MAX_PACKET_SIZE);
-
-                packetToBytes(packetPtr, packet);
-
-                fprintf(stderr, "%s\n", packet + 12);
-
-                writePacketSocket(sockfd, &cli_addr, clilen, packet);
-                for (int i = 0; i < MAX_PACKET_SIZE; ++i) {
-                    printf("%02x ", packet[i]);
-                }
-                printf("\n\n");
+            response = getPacketsResponse(clientPacket.payload);
+            if (response == NULL) {
+                writeErrorToSocket(sockfd, &cli_addr, clilen);
             }
+        }
+
+        // Send each packet to client from window
+        for (int i = windowLeftBound; i < windowLeftBound + WINDOW_SIZE; i += MAX_PACKET_SIZE) {
+            int index = i / MAX_PACKET_SIZE;
+            printf("%d\n", index);
+            struct Packet *packetPtr = response[index];
+
+            // Make packet to write
+            char packet[MAX_PACKET_SIZE];
+            bzero(packet, MAX_PACKET_SIZE);
+            packetToBytes(packetPtr, packet);
+            writePacketSocket(sockfd, &cli_addr, clilen, packet);
+            fprintf(stderr, "%s\n", packet + 12);                    
         }
     }
     return 0;
@@ -145,7 +151,7 @@ struct Packet** getPacketsResponse(const char *fileName) {
         for (int i = 0; i < numPackets; i++) {
             bzero(payloadTemp, PAYLOAD_SIZE + 1);
             fread(payloadTemp, 1, PAYLOAD_SIZE, f);
-            packets[i] = initPacket(payloadTemp, -1, -1, -1);
+            packets[i] = initPacket(payloadTemp, -1, -1, NONE);
         }
         packets[numPackets] = initPacket("\0", -1, -1, FIN);
         fclose(f);

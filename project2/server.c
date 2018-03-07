@@ -20,6 +20,7 @@ void writePacketSocket(const int socket, struct sockaddr_in* socketAddress, sock
 void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
 int getNumberPacketsForSize(long size);
 long getFileSize(const char *fileName);
+void setPacketReceived(struct Packet **packets, int numPackets, int sequenceNum);
 
 
 int main(int argc, char *argv[]) {
@@ -45,6 +46,8 @@ int main(int argc, char *argv[]) {
     */
     int optval = 1;
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(int));
+    // Set timeout of socket read
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&TIMEOUT, sizeof(TIMEOUT));
 
     bzero((char *)&serv_addr, sizeof(serv_addr));
     portno = atoi(argv[1]);
@@ -71,14 +74,14 @@ int main(int argc, char *argv[]) {
     int windowLeftBound;
     int windowRightBound;
     int maxWindowRightBound;
+    int numPackets;
     struct Packet **response = NULL;
     while (1) {
         // receive a UDP datagram from a client
         bzero(buffer, WINDOW_SIZE);
         int n = recvfrom(sockfd, buffer, WINDOW_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen);
-        if (n < 0) {
-            error("ERROR in recvfrom");
-        }
+        // Set timeoutStatus to true if recvfrom has timeout error
+        int timeoutStatus = n < 0;
 
         // Convert received packet from client into Packet struct
         struct Packet clientPacket;
@@ -91,7 +94,7 @@ int main(int argc, char *argv[]) {
             windowRightBound = WINDOW_SIZE;
             long fsize = getFileSize(clientPacket.payload);
             // Add 1 to number of packets for FIN packet            
-            int numPackets = getNumberPacketsForSize(fsize) + 1;
+            numPackets = getNumberPacketsForSize(fsize) + 1;
             maxWindowRightBound = numPackets * MAX_PACKET_SIZE;
 
             response = getPacketsResponse(clientPacket.payload);
@@ -100,6 +103,7 @@ int main(int argc, char *argv[]) {
             }
         } else if (clientPacket.flag == ACK) {
             printf("Received ACK for packet %d\n", clientPacket.ackNum);
+            setPacketReceived(response, numPackets, clientPacket.ackNum);
             if (clientPacket.ackNum == windowLeftBound) {
                 windowLeftBound += MAX_PACKET_SIZE;
                 windowRightBound += MAX_PACKET_SIZE;
@@ -111,7 +115,8 @@ int main(int argc, char *argv[]) {
             int index = i / MAX_PACKET_SIZE;
             struct Packet *packetPtr = response[index];
 
-            if (packetPtr->sent) {
+            // Don't resend packet if server received ACK or it is not timeout yet
+            if (packetPtr->received || !timeoutStatus) {
                 continue;
             }
 
@@ -120,7 +125,6 @@ int main(int argc, char *argv[]) {
             bzero(packet, MAX_PACKET_SIZE);
             packetToBytes(packetPtr, packet);
             writePacketSocket(sockfd, &cli_addr, clilen, packet);
-            packetPtr->sent = 1;
             printf("Sent packet w/ seqNum %d\n", packetPtr->sequenceNum);                
         }
     }
@@ -175,6 +179,20 @@ struct Packet** getPacketsResponse(const char *fileName) {
     }
     
     return packets;
+}
+
+void setPacketReceived(struct Packet **packets, int numPackets, int sequenceNum) {
+    if (packets == NULL) {
+        return;
+    }
+
+    for (int i = 0; i < numPackets; i++) {
+        struct Packet *packet = packets[i];
+        if (packet->sequenceNum == sequenceNum) {
+            packet->received = 1;
+            return;
+        }
+    }
 }
 
 int getNumberPacketsForSize(long size) {

@@ -149,8 +149,10 @@ void writePacketSocket(const int socket,
         error("ERROR sending data to socket");
     }
 }
+
 // Make array of pointers to Packet structs which hold the header and 
-// payload of response packets
+// payload of response packets; numPackets is passed in by reference to 
+// return the number of packets in the response including a FIN packet
 struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {    
     long fsize = getFileSize(fileName);
     struct Packet **packets = NULL;

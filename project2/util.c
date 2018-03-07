@@ -18,7 +18,7 @@ struct Packet* initPacket(const char *data, int sequenceNum, int ackNum, enum Fl
     bzero(newPacket->payload, PAYLOAD_SIZE + 1);
     memcpy(newPacket->payload, data, PAYLOAD_SIZE);
     newPacket->payload[PAYLOAD_SIZE] = '\0';
-    newPacket->sent = 0;
+    newPacket->received = 0;
     return newPacket;
 }
 

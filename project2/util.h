@@ -1,6 +1,9 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include <sys/time.h>
+
+static const struct timeval TIMEOUT = {0, 500000};
 static const int WINDOW_SIZE = 5120;
 static const int MAX_PACKET_SIZE = 1024;
 
@@ -15,7 +18,7 @@ struct Packet
     int ackNum;
     enum Flag flag;
     char payload[PAYLOAD_SIZE + 1];
-    int sent;
+    int received;
 };
 
 struct Packet* initPacket(const char *data, int sequenceNum, int ackNum, enum Flag flag);

@@ -85,23 +85,24 @@ int main(int argc, char *argv[])
             struct Packet packet;
             bytesToPacket(&packet, buffer);
             printf("Received packet %d\n", packet.sequenceNum);
-            
+
+            // Send an ACK for received packets with payload
+            struct Packet ackPacket;
+            ackPacket.flag = ACK;
+            ackPacket.sequenceNum = -1;
+            ackPacket.ackNum = packet.sequenceNum;
+            packetToBytes(&ackPacket, buffer);
+            n = sendto(sockfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, serverlen);
+            printf("Sent ACK for packet %d\n", ackPacket.ackNum);
+            if (n < 0) {
+                error("ERROR writing to socket");
+            }
+
+            // Close socket when receiving FIN
             if (packet.flag == FIN) {
                 // fclose(fp);
-                close(sockfd);                
+                close(sockfd);
                 break;
-            } else if (packet.flag == NONE) {
-                // Send an ACK for received packets with payload
-                struct Packet ackPacket;
-                ackPacket.flag = ACK;
-                ackPacket.sequenceNum = -1;
-                ackPacket.ackNum = packet.sequenceNum;
-                packetToBytes(&ackPacket, buffer);
-                n = sendto(sockfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, serverlen);
-                printf("Sent ACK for packet %d\n", ackPacket.ackNum);
-                if (n < 0) {
-                    error("ERROR writing to socket");
-                }
             }
 
             // n = fwrite(packet.payload, sizeof(char), PAYLOAD_SIZE, fp);

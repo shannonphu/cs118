@@ -15,7 +15,7 @@
 
 void sigchld_handler(int s);
 int checkCorrectFile(const char *path);
-struct Packet** getPacketsResponse(const char *fileName);
+struct Packet** getPacketsResponse(const char *fileName, int *numPackets);
 void writePacketSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
 void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
 int getNumberPacketsForSize(long size);
@@ -92,15 +92,14 @@ int main(int argc, char *argv[]) {
             // Reset congestion window bounds
             windowLeftBound = 0;
             windowRightBound = WINDOW_SIZE;
-            long fsize = getFileSize(clientPacket.payload);
-            // Add 1 to number of packets for FIN packet            
-            numPackets = getNumberPacketsForSize(fsize) + 1;
-            maxWindowRightBound = numPackets * MAX_PACKET_SIZE;
 
-            response = getPacketsResponse(clientPacket.payload);
+            response = getPacketsResponse(clientPacket.payload, &numPackets);
             if (response == NULL) {
                 writeErrorToSocket(sockfd, &cli_addr, clilen);
+                continue;
             }
+
+            maxWindowRightBound = numPackets * MAX_PACKET_SIZE;
         } else if (clientPacket.flag == ACK) {
             printf("Received ACK for packet %d\n", clientPacket.ackNum);
             setPacketReceived(response, numPackets, clientPacket.ackNum);
@@ -150,34 +149,42 @@ void writePacketSocket(const int socket,
         error("ERROR sending data to socket");
     }
 }
-
-struct Packet** getPacketsResponse(const char *fileName) {    
-    if (checkCorrectFile(fileName) != 1) {
-        return NULL;
-    }
-
-    // Make array of pointers to Packet structs which hold the header and 
-    // payload of response packets
+// Make array of pointers to Packet structs which hold the header and 
+// payload of response packets
+struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {    
     long fsize = getFileSize(fileName);
-    int numPackets = getNumberPacketsForSize(fsize);
-    // Add 1 to number of packets for FIN packet
-    struct Packet **packets = malloc((numPackets + 1) * sizeof(struct Packet *));
+    struct Packet **packets = NULL;
 
-    FILE *f = fopen(fileName, "rb");
-    if (f != NULL) {
+    if (fsize < 0 || checkCorrectFile(fileName) != 1) {
+        // Default for error messages (error msg + FIN)        
+        packets = malloc(2 * sizeof(struct Packet *));
+        packets[0] = initPacket("404: The requested file cannot be found or opened.", 0, -1, NONE);
+        packets[1] = initPacket("\0", MAX_PACKET_SIZE, -1, FIN);
+        *numPackets = 2;
+    } else {
+        int packetCount = getNumberPacketsForSize(fsize);
+        packets = malloc(packetCount + 1 * sizeof(struct Packet *));
+
+        FILE *f = fopen(fileName, "rb");
+        if (f == NULL) {
+            // TODO replace return NULL with return error msg in packets
+            return NULL;
+        }
+
         // Read file into packets array
         char payloadTemp[PAYLOAD_SIZE + 1];
-        for (int i = 0; i < numPackets; i++) {
+        // Loop over file contents excluding FIN
+        for (int i = 0; i < packetCount; i++) {
             bzero(payloadTemp, PAYLOAD_SIZE + 1);
             fread(payloadTemp, 1, PAYLOAD_SIZE, f);
             packets[i] = initPacket(payloadTemp, i * MAX_PACKET_SIZE, -1, NONE);
         }
-        packets[numPackets] = initPacket("\0", numPackets * MAX_PACKET_SIZE, -1, FIN);
+        // Init a FIN packet last in response
+        packets[packetCount] = initPacket("\0", packetCount * MAX_PACKET_SIZE, -1, FIN);
+        *numPackets = packetCount + 1; // includes FIN packet
         fclose(f);
-    } else {
-        return NULL;
     }
-    
+
     return packets;
 }
 

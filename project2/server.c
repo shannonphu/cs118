@@ -20,7 +20,7 @@ void writePacketSocket(const int socket, struct sockaddr_in* socketAddress, sock
 void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
 int getNumberPacketsForSize(long size);
 long getFileSize(const char *fileName);
-void setPacketReceived(struct Packet **packets, int numPackets, int sequenceNum);
+void setPacketReceived(struct Packet **packets, int numPackets, int offset);
 
 
 int main(int argc, char *argv[]) {
@@ -93,6 +93,9 @@ int main(int argc, char *argv[]) {
             windowLeftBound = 0;
             windowRightBound = WINDOW_SIZE;
 
+            // Free previous responses
+            freeResponse(response, numPackets);
+
             response = getPacketsResponse(clientPacket.payload, &numPackets);
             if (response == NULL) {
                 writeErrorToSocket(sockfd, &cli_addr, clilen);
@@ -101,7 +104,7 @@ int main(int argc, char *argv[]) {
 
             maxWindowRightBound = numPackets * MAX_PACKET_SIZE;
         } else if (clientPacket.flag == ACK) {
-            printf("Received ACK for packet %d\n", clientPacket.ackNum);
+            printf("Received ACK for packet %d\n", getSequenceNumber(clientPacket.ackNum));
             setPacketReceived(response, numPackets, clientPacket.ackNum);
             if (clientPacket.ackNum == windowLeftBound) {
                 windowLeftBound += MAX_PACKET_SIZE;
@@ -124,7 +127,7 @@ int main(int argc, char *argv[]) {
             bzero(packet, MAX_PACKET_SIZE);
             packetToBytes(packetPtr, packet);
             writePacketSocket(sockfd, &cli_addr, clilen, packet);
-            printf("Sent packet w/ seqNum %d\n", packetPtr->sequenceNum);                
+            printf("Sent packet w/ seqNum %d\n", getSequenceNumber(packetPtr->offset));                
         }
     }
     return 0;
@@ -175,6 +178,7 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
 
         // Read file into packets array
         char payloadTemp[PAYLOAD_SIZE + 1];
+        printf("%d\n", packetCount);
         // Loop over file contents excluding FIN
         for (int i = 0; i < packetCount; i++) {
             bzero(payloadTemp, PAYLOAD_SIZE + 1);
@@ -190,14 +194,14 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
     return packets;
 }
 
-void setPacketReceived(struct Packet **packets, int numPackets, int sequenceNum) {
+void setPacketReceived(struct Packet **packets, int numPackets, int offset) {
     if (packets == NULL) {
         return;
     }
 
     for (int i = 0; i < numPackets; i++) {
         struct Packet *packet = packets[i];
-        if (packet->sequenceNum == sequenceNum) {
+        if (packet->offset == offset) {
             packet->received = 1;
             return;
         }

@@ -56,19 +56,20 @@ int main(int argc, char *argv[])
     }
 
     // Setup file to write response to
-    // FILE *fp = fopen("received.data", "w");
-	// if (fp == NULL) {
-		// error("Error opening file for writing");
-    // }
+    FILE *fp = fopen("received.data", "w");
+	if (fp == NULL) {
+		error("Error opening file for writing");
+    }
     
     // Setup select
     fd_set sockets;
-    FD_ZERO(&sockets);
-    FD_SET(sockfd, &sockets);
 
     // Loop waiting for full response
     char buffer[MAX_PACKET_SIZE + 1];  
     while (1) {
+        FD_ZERO(&sockets);
+        FD_SET(sockfd, &sockets);
+
         int selectResult = select(sockfd + 1, &sockets, NULL, NULL, NULL);
         if (selectResult < 0) {
             error("Select error");
@@ -100,18 +101,17 @@ int main(int argc, char *argv[])
 
             // Close socket when receiving FIN
             if (packet.flag == FIN) {
-                // fclose(fp);
                 close(sockfd);
                 break;
+            } else {
+                n = fprintf(fp, "%s", packet.payload);
+                if (n < 0) {
+                    error("Error writing to received.data");
+                }
             }
-
-            // n = fwrite(packet.payload, sizeof(char), PAYLOAD_SIZE, fp);
-            // if (n < 0) {
-                // error("Error writing to received.data");
-            // }
         }
     }
     
-    // fclose(fp);
+    fclose(fp);
     return 0;
 }

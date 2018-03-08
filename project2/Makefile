@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS = 
+CFLAGS = -lm
 SERVER_OBJ = server.c util.c
 CLIENT_OBJ = client.c util.c
 

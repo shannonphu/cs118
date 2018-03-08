@@ -95,7 +95,6 @@ int main(int argc, char *argv[]) {
 
             // Free previous responses
             freeResponse(response, numPackets);
-
             response = getPacketsResponse(clientPacket.payload, &numPackets);
             if (response == NULL) {
                 writeErrorToSocket(sockfd, &cli_addr, clilen);
@@ -168,7 +167,7 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
         *numPackets = 2;
     } else {
         int packetCount = getNumberPacketsForSize(fsize);
-        packets = malloc(packetCount + 1 * sizeof(struct Packet *));
+        packets = malloc((packetCount + 1) * sizeof(struct Packet *));
 
         FILE *f = fopen(fileName, "rb");
         if (f == NULL) {
@@ -178,7 +177,6 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
 
         // Read file into packets array
         char payloadTemp[PAYLOAD_SIZE + 1];
-        printf("%d\n", packetCount);
         // Loop over file contents excluding FIN
         for (int i = 0; i < packetCount; i++) {
             bzero(payloadTemp, PAYLOAD_SIZE + 1);

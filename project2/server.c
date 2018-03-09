@@ -103,11 +103,26 @@ int main(int argc, char *argv[]) {
 
             maxWindowRightBound = numPackets * MAX_PACKET_SIZE;
         } else if (clientPacket.flag == ACK) {
-            printf("Received ACK for packet %d\n", getSequenceNumber(clientPacket.ackNum));
+            printf("\tReceived ACK for packet %d\n", getSequenceNumber(clientPacket.ackNum));
             setPacketReceived(response, numPackets, clientPacket.ackNum);
             if (clientPacket.ackNum == windowLeftBound) {
-                windowLeftBound += MAX_PACKET_SIZE;
-                windowRightBound += MAX_PACKET_SIZE;
+                // If the leftmost item gets ACKed, move the window to 
+                // the next unACKed packet. If all packets were just
+                // ACKed in the window, select the first packet in the 
+                // next window
+                for (int i = windowLeftBound; i <= windowLeftBound + WINDOW_SIZE && i < maxWindowRightBound; i += MAX_PACKET_SIZE) {
+                    int index = i / MAX_PACKET_SIZE;
+                    struct Packet *packetPtr = response[index];
+
+                    // Set the new window bounds starting at the next unreceived packet
+                    if (packetPtr->received) {
+                        windowLeftBound += MAX_PACKET_SIZE;
+                        windowRightBound += MAX_PACKET_SIZE;
+                    } else {
+                        printf("Window starts at %d\n", windowLeftBound);
+                        break;
+                    }
+                }
             }      
         }
 
@@ -126,7 +141,7 @@ int main(int argc, char *argv[]) {
             bzero(packet, MAX_PACKET_SIZE);
             packetToBytes(packetPtr, packet);
             writePacketSocket(sockfd, &cli_addr, clilen, packet);
-            printf("Sent packet w/ seqNum %d\n", getSequenceNumber(packetPtr->offset));                
+            printf("\tSent packet w/ seqNum %d\n", getSequenceNumber(packetPtr->offset));                
         }
     }
     return 0;

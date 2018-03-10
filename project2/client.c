@@ -68,6 +68,8 @@ int main(int argc, char *argv[])
     // Setup select
     fd_set sockets;
 
+    struct timeval CONNECTION_TIMEOUT = {1, 0};
+
     // Loop waiting for full response
     char buffer[MAX_PACKET_SIZE + 1];  
     struct Packet receiveWindow[WINDOW_SIZE / MAX_PACKET_SIZE];

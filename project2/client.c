@@ -8,10 +8,14 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <unistd.h>
 
 #include "util.h"
+
+void writeToFile(FILE *file, const char *data);
+void printWindow(struct Packet *window, int count);
 
 int main(int argc, char *argv[])
 {
@@ -66,12 +70,19 @@ int main(int argc, char *argv[])
 
     // Loop waiting for full response
     char buffer[MAX_PACKET_SIZE + 1];  
+    struct Packet receiveWindow[WINDOW_SIZE / MAX_PACKET_SIZE];
+    int receiveWindowBase = 0;
     while (1) {
         FD_ZERO(&sockets);
         FD_SET(sockfd, &sockets);
 
-        int selectResult = select(sockfd + 1, &sockets, NULL, NULL, NULL);
+        int selectResult = select(sockfd + 1, &sockets, NULL, NULL, &CONNECTION_TIMEOUT);
+
+        // TODO
+        // If there was a timeout error, check if all packets
+        // were received and initiate closing the connection
         if (selectResult < 0) {
+            fclose(fp);
             error("Select error");
         }
 
@@ -85,7 +96,7 @@ int main(int argc, char *argv[])
 
             struct Packet packet;
             bytesToPacket(&packet, buffer);
-            printf("Received packet %d\n", getSequenceNumber(packet.offset));
+            printf("\tReceived packet %d\n", getSequenceNumber(packet.offset));
 
             // Send an ACK for received packets with payload
             struct Packet ackPacket;
@@ -94,24 +105,80 @@ int main(int argc, char *argv[])
             ackPacket.ackNum = packet.offset;
             packetToBytes(&ackPacket, buffer);
             n = sendto(sockfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, serverlen);
-            printf("Sent ACK for packet %d\n", getSequenceNumber(ackPacket.ackNum));
+            // printf("\tSent ACK for packet %d\n", getSequenceNumber(ackPacket.ackNum));
             if (n < 0) {
                 error("ERROR writing to socket");
             }
 
             // Close socket when receiving FIN
             if (packet.flag == FIN) {
-                close(sockfd);
+                // close(sockfd);
                 break;
             } else {
-                n = fprintf(fp, "%s", packet.payload);
-                if (n < 0) {
-                    error("Error writing to received.data");
+                // n = fprintf(fp, "%s", packet.payload);
+                // if (n < 0) {
+                //     error("Error writing to received.data");
+                // }
+            }
+
+            // Don't add past received packets to the window or write to file
+            if (packet.offset < receiveWindowBase) {
+                continue;
+            }
+
+            // Place the packet into the buffer in order within receive window
+            for (int i = 0; i < WINDOW_SIZE / MAX_PACKET_SIZE; i++) {
+                if (receiveWindowBase + i * MAX_PACKET_SIZE == packet.offset) {
+                    receiveWindow[i] = packet;
+                    receiveWindow[i].received = 1;
+                    printWindow(receiveWindow, WINDOW_SIZE / MAX_PACKET_SIZE);
+                    break;
                 }
             }
+
+            // If received packet is at the beginning of the window,
+            // write all following received data in window to file
+            // and move remaining packets to be the new base
+            if (receiveWindowBase == packet.offset) {
+                for (int j = 0; j < WINDOW_SIZE / MAX_PACKET_SIZE; j++) {
+                    if (receiveWindow[j].received) {
+                        printf("Wrote packet %d to file\n", receiveWindow[j].offset);
+                        writeToFile(fp, receiveWindow[j].payload);
+                    } else {
+                        // Move remaining packets to front of window
+                        receiveWindowBase = receiveWindow[j - 1].offset + MAX_PACKET_SIZE;
+
+                        int packetsToMove = (WINDOW_SIZE / MAX_PACKET_SIZE) - j; 
+                        // Use sizeof Packets to include the received field in 
+                        // the copied data since it isnt included in the 
+                        // MAX_PACKET_SIZE
+                        int bytesToMove = packetsToMove * sizeof(struct Packet); 
+                        memcpy(receiveWindow, receiveWindow + j, bytesToMove);
+                        bzero(receiveWindow + packetsToMove, ((WINDOW_SIZE / MAX_PACKET_SIZE) - packetsToMove) * sizeof(struct Packet));
+                        printWindow(receiveWindow, WINDOW_SIZE / MAX_PACKET_SIZE);
+                        break;
+                    }
+                }
+            }
+
+            printf("\n");
         }
     }
     
     fclose(fp);
     return 0;
+}
+
+void writeToFile(FILE *file, const char *data) {
+    int n = fprintf(file, "%s", data);
+    if (n < 0) {
+        error("Error writing to received.data");
+    }
+}
+
+void printWindow(struct Packet *window, int count) {
+    for (int i = 0; i < count; i++) {
+        printf("%d ", window[i].offset);
+    }
+    printf("\n");
 }

@@ -4,6 +4,7 @@
 #include <sys/time.h>
 
 static const struct timeval TIMEOUT = {0, 500000};
+static const struct timeval CONNECTION_TIMEOUT = {1, 0};
 #define WINDOW_SIZE 5120
 #define MAX_PACKET_SIZE 1024
 #define MAX_SEQUENCE_NUMBER 30720

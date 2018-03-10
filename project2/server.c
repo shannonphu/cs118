@@ -191,10 +191,10 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
         }
 
         // Read file into packets array
-        char payloadTemp[PAYLOAD_SIZE + 1];
+        char payloadTemp[PAYLOAD_SIZE];
         // Loop over file contents excluding FIN
         for (int i = 0; i < packetCount; i++) {
-            bzero(payloadTemp, PAYLOAD_SIZE + 1);
+            bzero(payloadTemp, PAYLOAD_SIZE);
             fread(payloadTemp, 1, PAYLOAD_SIZE, f);
             packets[i] = initPacket(payloadTemp, i * MAX_PACKET_SIZE, -1, NONE);
         }

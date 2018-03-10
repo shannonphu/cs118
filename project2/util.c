@@ -16,7 +16,7 @@ struct Packet* initPacket(const char *data, int offset, int ackNum, enum Flag fl
     newPacket->ackNum = ackNum;
     newPacket->flag = flag;
     bzero(newPacket->payload, PAYLOAD_SIZE);
-    memcpy(newPacket->payload, data, PAYLOAD_SIZE);
+    memcpy(newPacket->payload, data, PAYLOAD_SIZE - 1);
     newPacket->received = 0;
     return newPacket;
 }

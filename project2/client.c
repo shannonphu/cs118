@@ -68,17 +68,15 @@ int main(int argc, char *argv[])
     // Setup select
     fd_set sockets;
 
-    struct timeval CONNECTION_TIMEOUT = {1, 0};
-
     // Loop waiting for full response
     char buffer[MAX_PACKET_SIZE + 1];  
-    struct Packet receiveWindow[WINDOW_SIZE / MAX_PACKET_SIZE];
+    struct Packet receiveWindow[WINDOW_SIZE / MAX_PACKET_SIZE] = {0};
     int receiveWindowBase = 0;
     while (1) {
         FD_ZERO(&sockets);
         FD_SET(sockfd, &sockets);
 
-        int selectResult = select(sockfd + 1, &sockets, NULL, NULL, &CONNECTION_TIMEOUT);
+        int selectResult = select(sockfd + 1, &sockets, NULL, NULL, NULL);
 
         // TODO
         // If there was a timeout error, check if all packets
@@ -87,9 +85,6 @@ int main(int argc, char *argv[])
         if (selectResult < 0) {
             fclose(fp);
             error("Select error");
-        } else if (selectResult == 0) {
-            fclose(fp);
-            return 1;
         }
 
         if (FD_ISSET(sockfd, &sockets)) {
@@ -173,7 +168,7 @@ void writeToFile(FILE *file, const char *data) {
 
 void printWindow(struct Packet *window, int count) {
     for (int i = 0; i < count; i++) {
-        printf("%d ", window[i].offset);
+        printf("%d,%d ", window[i].offset, window[i].received);
     }
     printf("\n");
 }

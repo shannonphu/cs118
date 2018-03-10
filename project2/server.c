@@ -77,6 +77,8 @@ int main(int argc, char *argv[]) {
     int numPackets;
     struct Packet **response = NULL;
     while (1) {
+        fflush(stdout);
+        
         // receive a UDP datagram from a client
         bzero(buffer, WINDOW_SIZE);
         int n = recvfrom(sockfd, buffer, WINDOW_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen);
@@ -86,6 +88,7 @@ int main(int argc, char *argv[]) {
         // Convert received packet from client into Packet struct
         struct Packet clientPacket;
         bytesToPacket(&clientPacket, buffer);
+
 
         // Received file request
         if (clientPacket.flag == SYN) {
@@ -191,10 +194,10 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
         }
 
         // Read file into packets array
-        char payloadTemp[PAYLOAD_SIZE + 1];
+        char payloadTemp[PAYLOAD_SIZE];
         // Loop over file contents excluding FIN
         for (int i = 0; i < packetCount; i++) {
-            bzero(payloadTemp, PAYLOAD_SIZE + 1);
+            bzero(payloadTemp, PAYLOAD_SIZE);
             fread(payloadTemp, 1, PAYLOAD_SIZE, f);
             packets[i] = initPacket(payloadTemp, i * MAX_PACKET_SIZE, -1, NONE);
         }

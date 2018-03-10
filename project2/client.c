@@ -122,8 +122,12 @@ int main(int argc, char *argv[])
             // Place the packet into the buffer in order within receive window
             for (int i = 0; i < WINDOW_SIZE / MAX_PACKET_SIZE; i++) {
                 if (receiveWindowBase + i * MAX_PACKET_SIZE == packet.offset) {
-                    receiveWindow[i] = packet;
-                    receiveWindow[i].received = 1;
+                    packet.received = 1;
+                    memcpy(receiveWindow + i, &packet, sizeof(struct Packet));
+                    // printf("%s\n", packet.payload);
+                    // receiveWindow[i] = packet;
+                    // receiveWindow[i].received = 1;
+                    // printf("%s\n", receiveWindow[i].payload);
                     printWindow(receiveWindow, WINDOW_SIZE / MAX_PACKET_SIZE);
                     break;
                 }

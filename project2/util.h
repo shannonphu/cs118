@@ -12,7 +12,8 @@ static const struct timeval CONNECTION_TIMEOUT = {1, 0};
 void error(char *msg);
 
 enum Flag { NONE, RETRANSMISSION, SYN, FIN, SYN_ACK, ACK };
-#define PAYLOAD_SIZE (MAX_PACKET_SIZE - 2 * sizeof(int) - sizeof(enum Flag))
+// Leave 1 char for NULL termination
+#define PAYLOAD_SIZE (MAX_PACKET_SIZE - 2 * sizeof(int) - sizeof(enum Flag) + 1)
 
 struct Packet
 {

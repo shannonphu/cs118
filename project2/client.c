@@ -80,10 +80,14 @@ int main(int argc, char *argv[])
 
         // TODO
         // If there was a timeout error, check if all packets
-        // were received and initiate closing the connection
+        // were received and initiate closing the connection by
+        // sending FIN
         if (selectResult < 0) {
             fclose(fp);
             error("Select error");
+        } else if (selectResult == 0) {
+            fclose(fp);
+            return 1;
         }
 
         if (FD_ISSET(sockfd, &sockets)) {
@@ -108,17 +112,6 @@ int main(int argc, char *argv[])
             // printf("\tSent ACK for packet %d\n", getSequenceNumber(ackPacket.ackNum));
             if (n < 0) {
                 error("ERROR writing to socket");
-            }
-
-            // Close socket when receiving FIN
-            if (packet.flag == FIN) {
-                // close(sockfd);
-                break;
-            } else {
-                // n = fprintf(fp, "%s", packet.payload);
-                // if (n < 0) {
-                //     error("Error writing to received.data");
-                // }
             }
 
             // Don't add past received packets to the window or write to file

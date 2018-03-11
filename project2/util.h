@@ -12,7 +12,7 @@ static const struct timeval TIMEOUT = {0, 500000};
 
 void error(char *msg);
 
-enum Flag { NONE, RETRANSMISSION, SYN, FIN, SYN_ACK, ACK, FIN_ACK };
+enum Flag { NONE, SYN, FIN, ACK, FIN_ACK };
 // Leave 1 char for NULL termination
 #define PAYLOAD_SIZE (MAX_PACKET_SIZE - 2 * sizeof(int) - sizeof(enum Flag))
 
@@ -37,6 +37,7 @@ void packetToBytes(const struct Packet *packet, char *byteArray);
 
 void bytesToPacket(struct Packet *packet, const char *byteArray);
 
+void getFlagName(enum Flag flag, char *name);
 
 int getSequenceNumber(const int offset);
 

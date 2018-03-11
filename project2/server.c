@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
             windowRightBound = WINDOW_SIZE;
             maxWindowRightBound = numPackets * MAX_PACKET_SIZE;
         } else if (clientPacket.flag == ACK) {
-            printf("Received ACK for packet %d\n", getSequenceNumber(clientPacket.ackNum));
+            printf("Receiving packet %d\n", getSequenceNumber(clientPacket.ackNum));
             setPacketReceived(response, numPackets, clientPacket.ackNum);
             if (clientPacket.ackNum == windowLeftBound) {
                 // If the leftmost item gets ACKed, move the window to 
@@ -119,9 +119,10 @@ int main(int argc, char *argv[]) {
                 }
             }      
         } else if (clientPacket.flag == FIN_ACK) {
+            printf("Receiving packet %d\n", getSequenceNumber(clientPacket.ackNum));
+
             // Free previous responses
             freeResponse(response, numPackets);
-            printf("Client received FIN. Sending ACK for FIN_ACK\n");
             numPackets = 0;
         }
 
@@ -136,7 +137,9 @@ int main(int argc, char *argv[]) {
             }
 
             writePacketToSocket(sockfd, &cli_addr, clilen, packetPtr);
-            printf("Sent packet w/ seqNum %d\n", getSequenceNumber(packetPtr->offset));
+            char flagName[3];
+            getFlagName(packetPtr->flag, flagName);
+            printf("Sending packet %d %d %s\n", getSequenceNumber(packetPtr->offset), WINDOW_SIZE, flagName);
         }
     }
     return 0;
@@ -161,7 +164,7 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
         packets = malloc((packetCount + 1) * sizeof(struct Packet *));
 
         FILE *f = fopen(fileName, "rb");
-        
+
         // Read file into packets array
         char payloadTemp[PAYLOAD_SIZE];
         // Loop over file contents excluding FIN

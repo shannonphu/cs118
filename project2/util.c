@@ -64,6 +64,20 @@ int getSequenceNumber(const int offset) {
     return offset % (MAX_SEQUENCE_NUMBER + MAX_PACKET_SIZE);
 }
 
+void getFlagName(enum Flag flag, char *name) {
+    switch (flag) {
+        case SYN:
+            name = "SYN";
+            break;
+        case FIN:
+            name = "FIN";
+            break;
+        default:
+            name = "";
+            break;
+    }
+}
+
 // Writes MAX_PACKET_SIZE amount in bytes from data to socket.
 void writeDataToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data) 
 {

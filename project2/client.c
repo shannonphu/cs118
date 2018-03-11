@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
     requestPacket.flag = SYN;
     memcpy(requestPacket.payload, filename, strlen(filename));
     writePacketToSocket(sockfd, &serv_addr, serverlen, &requestPacket);
-
+    printf("Sending packet SYN\n");
 
     // Setup file to write response to
     FILE *fp = fopen("received.data", "w");
@@ -89,6 +89,7 @@ int main(int argc, char *argv[])
 
             if (!requestReceived) {
                 writePacketToSocket(sockfd, &serv_addr, serverlen, &requestPacket);
+                printf("Sending packet Retransmission SYN\n");
             }
         }
 
@@ -105,7 +106,7 @@ int main(int argc, char *argv[])
             struct Packet packet;
             bzero(&packet, sizeof(struct Packet));
             bytesToPacket(&packet, buffer);
-            printf("\tReceived packet %d\n", getSequenceNumber(packet.offset));
+            printf("Receiving %d\n", getSequenceNumber(packet.offset));
 
             // Send an ACK for received packets with payload
             struct Packet ackPacket;
@@ -127,8 +128,18 @@ int main(int argc, char *argv[])
             ackPacket.ackNum = packet.offset;
             writePacketToSocket(sockfd, &serv_addr, serverlen, &ackPacket);
 
+            char flagName[3];
+            getFlagName(ackPacket.flag, flagName);
+
             // Don't add past received packets to the window or write to file
-            if (packet.offset < receiveWindowBase || packet.flag == SYN_ACK || packet.flag == FIN || packet.flag == ACK) {
+            if (packet.offset < receiveWindowBase) {
+                printf("Sending packet %d Retransmission %s\n", getSequenceNumber(ackPacket.ackNum), flagName);
+                continue;
+            } else {
+                printf("Sending packet %d %s\n", getSequenceNumber(ackPacket.ackNum), flagName);
+            }
+
+            if (packet.flag == FIN) {
                 continue;
             }
 
@@ -138,7 +149,7 @@ int main(int argc, char *argv[])
                     bzero(&receiveWindow[i], sizeof(struct Packet));
                     receiveWindow[i] = packet;
                     receiveWindow[i].received = 1;
-                    printWindow(receiveWindow, WINDOW_SIZE / MAX_PACKET_SIZE);
+                    // printWindow(receiveWindow, WINDOW_SIZE / MAX_PACKET_SIZE);
                     break;
                 }
             }
@@ -150,7 +161,7 @@ int main(int argc, char *argv[])
                 int totalInWindow = 0;
                 for (int j = 0; j < WINDOW_SIZE / MAX_PACKET_SIZE; j++) {
                     if (receiveWindow[j].received) {
-                        printf("Wrote packet %d to file\n", receiveWindow[j].offset);
+                        // printf("Wrote packet %d to file\n", receiveWindow[j].offset);
                         char payload[PAYLOAD_SIZE + 1];
                         bzero(payload, PAYLOAD_SIZE + 1);
                         memcpy(&payload, receiveWindow[j].payload, PAYLOAD_SIZE);
@@ -167,7 +178,7 @@ int main(int argc, char *argv[])
                         int bytesToMove = packetsToMove * sizeof(struct Packet); 
                         memcpy(receiveWindow, receiveWindow + j, bytesToMove);
                         bzero(receiveWindow + packetsToMove, ((WINDOW_SIZE / MAX_PACKET_SIZE) - packetsToMove) * sizeof(struct Packet));
-                        printWindow(receiveWindow, WINDOW_SIZE / MAX_PACKET_SIZE);
+                        // printWindow(receiveWindow, WINDOW_SIZE / MAX_PACKET_SIZE);
                         break;
                     }
                 }
@@ -179,7 +190,7 @@ int main(int argc, char *argv[])
                 }
             }
 
-            printf("\n");
+            // printf("\n");
         }
     }
     

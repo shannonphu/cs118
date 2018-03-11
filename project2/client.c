@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) 
         error("ERROR opening socket");
-    
+
     server = gethostbyname(argv[1]);
     if (server == NULL) {
         fprintf(stderr,"ERROR, no such host\n");
@@ -50,14 +50,11 @@ int main(int argc, char *argv[])
     socklen_t serverlen = sizeof(serv_addr);
 
     // Send file request packet
-    struct Packet *requestPacket = initPacket(filename, -1, -1, SYN);
-    char request[MAX_PACKET_SIZE];
-    bzero(request, MAX_PACKET_SIZE);
-    packetToBytes(requestPacket, request);
-    int n = sendto(sockfd, request, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, serverlen);
-    if (n < 0) {
-        error("ERROR writing to socket");
-    }
+    struct Packet requestPacket;
+    requestPacket.flag = SYN;
+    memcpy(requestPacket.payload, filename, strlen(filename));
+    writePacketToSocket(sockfd, (struct sockaddr *)&serv_addr, serverlen, &requestPacket);
+
 
     // Setup file to write response to
     FILE *fp = fopen("received.data", "w");
@@ -72,28 +69,37 @@ int main(int argc, char *argv[])
     char buffer[MAX_PACKET_SIZE + 1];  
     struct Packet receiveWindow[WINDOW_SIZE / MAX_PACKET_SIZE] = {0};
     int receiveWindowBase = 0;
+    int doneReceivingData = 0;
+    int requestReceived = 0;
     while (1) {
         FD_ZERO(&sockets);
         FD_SET(sockfd, &sockets);
 
-        int selectResult = select(sockfd + 1, &sockets, NULL, NULL, NULL);
+        struct timeval CONNECTION_TIMEOUT = {1, 0};
+        int selectResult = select(sockfd + 1, &sockets, NULL, NULL, &CONNECTION_TIMEOUT);
 
-        // TODO
-        // If there was a timeout error, check if all packets
-        // were received and initiate closing the connection by
-        // sending FIN
         if (selectResult < 0) {
             fclose(fp);
             error("Select error");
+        } else if (selectResult == 0) {
+            if (doneReceivingData) {
+                return 1;
+            }
+
+            if (!requestReceived) {
+                writePacketToSocket(sockfd, (struct sockaddr *)&serv_addr, serverlen, &requestPacket);
+            }
         }
 
         if (FD_ISSET(sockfd, &sockets)) {
             bzero(buffer, MAX_PACKET_SIZE + 1);
 
-            n = recvfrom(sockfd, buffer, MAX_PACKET_SIZE, 0, &serv_addr, &serverlen);
+            int n = recvfrom(sockfd, buffer, MAX_PACKET_SIZE, 0, &serv_addr, &serverlen);
             if (n < 0) {
                 error("ERROR reading from socket");
             } 
+
+            requestReceived = 1;
 
             struct Packet packet;
             bzero(&packet, sizeof(struct Packet));
@@ -104,22 +110,14 @@ int main(int argc, char *argv[])
             struct Packet ackPacket;
 
             switch(packet.flag) {
-                case SYN:
-                    ackPacket.flag = SYN_ACK;
-                    break;
                 case FIN:
                     ackPacket.flag = FIN_ACK;
                     // If still waiting for unreceived packets, ignore FIN to wait for more data, otherwise close the file
-                    if (packet.offset == receiveWindowBase) {
-                        // fclose(fp);
-                    } else {
+                    if (packet.offset != receiveWindowBase) {
                         continue;
                     }
-                    break;
-                // An ACK is only received from the server after FIN_ACK is sent
-                case ACK:
                     fclose(fp);
-                    return 1;
+                    doneReceivingData = 1;
                     break;
                 default:
                     ackPacket.flag = ACK;
@@ -130,7 +128,7 @@ int main(int argc, char *argv[])
             writePacketToSocket(sockfd, (struct sockaddr *)&serv_addr, serverlen, &ackPacket);
 
             // Don't add past received packets to the window or write to file
-            if (packet.offset < receiveWindowBase || packet.flag == FIN) {
+            if (packet.offset < receiveWindowBase || packet.flag == SYN_ACK || packet.flag == FIN || packet.flag == ACK) {
                 continue;
             }
 
@@ -149,6 +147,7 @@ int main(int argc, char *argv[])
             // write all following received data in window to file
             // and move remaining packets to be the new base
             if (receiveWindowBase == packet.offset) {
+                int totalInWindow = 0;
                 for (int j = 0; j < WINDOW_SIZE / MAX_PACKET_SIZE; j++) {
                     if (receiveWindow[j].received) {
                         printf("Wrote packet %d to file\n", receiveWindow[j].offset);
@@ -156,6 +155,7 @@ int main(int argc, char *argv[])
                         bzero(payload, PAYLOAD_SIZE + 1);
                         memcpy(&payload, receiveWindow[j].payload, PAYLOAD_SIZE);
                         writeToFile(fp, payload);
+                        totalInWindow++;
                     } else {
                         // Move remaining packets to front of window
                         receiveWindowBase = receiveWindow[j - 1].offset + MAX_PACKET_SIZE;
@@ -170,6 +170,12 @@ int main(int argc, char *argv[])
                         printWindow(receiveWindow, WINDOW_SIZE / MAX_PACKET_SIZE);
                         break;
                     }
+                }
+
+                // Window became full and all packets in the window were written to file
+                if (totalInWindow == WINDOW_SIZE / MAX_PACKET_SIZE) {
+                    receiveWindowBase += WINDOW_SIZE;
+                    bzero(receiveWindow, sizeof(receiveWindow));
                 }
             }
 

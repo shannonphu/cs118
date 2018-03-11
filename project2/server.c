@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
             windowRightBound = WINDOW_SIZE;
             maxWindowRightBound = numPackets * MAX_PACKET_SIZE;
         } else if (clientPacket.flag == ACK) {
-            printf("\tReceived ACK for packet %d\n", getSequenceNumber(clientPacket.ackNum));
+            printf("Received ACK for packet %d\n", getSequenceNumber(clientPacket.ackNum));
             setPacketReceived(response, numPackets, clientPacket.ackNum);
             if (clientPacket.ackNum == windowLeftBound) {
                 // If the leftmost item gets ACKed, move the window to 
@@ -114,7 +114,6 @@ int main(int argc, char *argv[]) {
                         windowLeftBound += MAX_PACKET_SIZE;
                         windowRightBound += MAX_PACKET_SIZE;
                     } else {
-                        printf("Window starts at %d\n", windowLeftBound);
                         break;
                     }
                 }
@@ -122,20 +121,12 @@ int main(int argc, char *argv[]) {
         } else if (clientPacket.flag == FIN_ACK) {
             // Free previous responses
             freeResponse(response, numPackets);
-            windowLeftBound = maxWindowRightBound;
-            printf("Finished sending response\n");
-
-            // Send ACK for FIN_ACK
-            struct Packet ackPacket;
-            ackPacket.flag = ACK;
-            ackPacket.offset = maxWindowRightBound;
-            ackPacket.ackNum = clientPacket.offset;
-            writePacketToSocket(sockfd, &cli_addr, clilen, &ackPacket);
-            continue;
+            printf("Client received FIN. Sending ACK for FIN_ACK\n");
+            numPackets = 0;
         }
 
         // Send each packet to client from window
-        for (int i = windowLeftBound; i < windowLeftBound + WINDOW_SIZE && i < maxWindowRightBound; i += MAX_PACKET_SIZE) {
+        for (int i = windowLeftBound; i < windowLeftBound + WINDOW_SIZE && i < maxWindowRightBound && i / MAX_PACKET_SIZE < numPackets; i += MAX_PACKET_SIZE) {
             int index = i / MAX_PACKET_SIZE;
             struct Packet *packetPtr = response[index];
 
@@ -145,7 +136,7 @@ int main(int argc, char *argv[]) {
             }
 
             writePacketToSocket(sockfd, &cli_addr, clilen, packetPtr);
-            printf("\tSent packet w/ seqNum %d\n", getSequenceNumber(packetPtr->offset));                
+            printf("Sent packet w/ seqNum %d\n", getSequenceNumber(packetPtr->offset));
         }
     }
     return 0;
@@ -165,8 +156,8 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
         packets[1] = initPacket("\0", MAX_PACKET_SIZE, -1, FIN);
         *numPackets = 2;
     } else {
-        // TODO add final ACK in here
         int packetCount = getNumberPacketsForSize(fsize);
+        // Add one more packets on top of payload for FIN
         packets = malloc((packetCount + 1) * sizeof(struct Packet *));
 
         FILE *f = fopen(fileName, "rb");

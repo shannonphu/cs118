@@ -161,11 +161,7 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
         packets = malloc((packetCount + 1) * sizeof(struct Packet *));
 
         FILE *f = fopen(fileName, "rb");
-        if (f == NULL) {
-            // TODO replace return NULL with return error msg in packets
-            return NULL;
-        }
-
+        
         // Read file into packets array
         char payloadTemp[PAYLOAD_SIZE];
         // Loop over file contents excluding FIN

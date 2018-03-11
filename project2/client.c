@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
     struct Packet requestPacket;
     requestPacket.flag = SYN;
     memcpy(requestPacket.payload, filename, strlen(filename));
-    writePacketToSocket(sockfd, (struct sockaddr *)&serv_addr, serverlen, &requestPacket);
+    writePacketToSocket(sockfd, &serv_addr, serverlen, &requestPacket);
 
 
     // Setup file to write response to
@@ -83,18 +83,19 @@ int main(int argc, char *argv[])
             error("Select error");
         } else if (selectResult == 0) {
             if (doneReceivingData) {
+                fclose(fp);
                 return 1;
             }
 
             if (!requestReceived) {
-                writePacketToSocket(sockfd, (struct sockaddr *)&serv_addr, serverlen, &requestPacket);
+                writePacketToSocket(sockfd, &serv_addr, serverlen, &requestPacket);
             }
         }
 
         if (FD_ISSET(sockfd, &sockets)) {
             bzero(buffer, MAX_PACKET_SIZE + 1);
 
-            int n = recvfrom(sockfd, buffer, MAX_PACKET_SIZE, 0, &serv_addr, &serverlen);
+            int n = recvfrom(sockfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, &serverlen);
             if (n < 0) {
                 error("ERROR reading from socket");
             } 
@@ -116,7 +117,6 @@ int main(int argc, char *argv[])
                     if (packet.offset != receiveWindowBase) {
                         continue;
                     }
-                    fclose(fp);
                     doneReceivingData = 1;
                     break;
                 default:
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
             }
             ackPacket.offset = -1;
             ackPacket.ackNum = packet.offset;
-            writePacketToSocket(sockfd, (struct sockaddr *)&serv_addr, serverlen, &ackPacket);
+            writePacketToSocket(sockfd, &serv_addr, serverlen, &ackPacket);
 
             // Don't add past received packets to the window or write to file
             if (packet.offset < receiveWindowBase || packet.flag == SYN_ACK || packet.flag == FIN || packet.flag == ACK) {

@@ -139,7 +139,13 @@ int main(int argc, char *argv[]) {
             writePacketToSocket(sockfd, &cli_addr, clilen, packetPtr);
             char flagName[3] = {0};
             getFlagName(packetPtr->flag, flagName);
-            printf("Sending packet %d %d %s\n", getSequenceNumber(packetPtr->offset), WINDOW_SIZE, flagName);
+
+            if (packetPtr->sent) {
+                printf("Sending packet %d %d Retransmission %s\n", getSequenceNumber(packetPtr->offset), WINDOW_SIZE, flagName);
+            } else {
+                packetPtr->sent = 1;
+                printf("Sending packet %d %d %s\n", getSequenceNumber(packetPtr->offset), WINDOW_SIZE, flagName);
+            }
         }
     }
     return 0;
@@ -155,7 +161,7 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
     if (fsize < 0 || checkCorrectFile(fileName) != 1) {
         // Default for error messages (error msg + FIN)        
         packets = malloc(2 * sizeof(struct Packet *));
-        packets[0] = initPacket("404: The requested file cannot be found or opened.", 0, -1, NONE);
+        packets[0] = initPacket("404: The requested file cannot be found or opened.\n", 0, -1, NONE);
         packets[1] = initPacket("\0", MAX_PACKET_SIZE, -1, FIN);
         *numPackets = 2;
     } else {

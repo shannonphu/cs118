@@ -96,29 +96,48 @@ int main(int argc, char *argv[])
             } 
 
             struct Packet packet;
+            bzero(&packet, sizeof(struct Packet));
             bytesToPacket(&packet, buffer);
             printf("\tReceived packet %d\n", getSequenceNumber(packet.offset));
 
             // Send an ACK for received packets with payload
             struct Packet ackPacket;
-            ackPacket.flag = ACK;
+
+            switch(packet.flag) {
+                case SYN:
+                    ackPacket.flag = SYN_ACK;
+                    break;
+                case FIN:
+                    ackPacket.flag = FIN_ACK;
+                    // If still waiting for unreceived packets, ignore FIN to wait for more data, otherwise close the file
+                    if (packet.offset == receiveWindowBase) {
+                        // fclose(fp);
+                    } else {
+                        continue;
+                    }
+                    break;
+                // An ACK is only received from the server after FIN_ACK is sent
+                case ACK:
+                    fclose(fp);
+                    return 1;
+                    break;
+                default:
+                    ackPacket.flag = ACK;
+                    break;
+            }
             ackPacket.offset = -1;
             ackPacket.ackNum = packet.offset;
-            packetToBytes(&ackPacket, buffer);
-            n = sendto(sockfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&serv_addr, serverlen);
-            // printf("\tSent ACK for packet %d\n", getSequenceNumber(ackPacket.ackNum));
-            if (n < 0) {
-                error("ERROR writing to socket");
-            }
+            writePacketToSocket(sockfd, (struct sockaddr *)&serv_addr, serverlen, &ackPacket);
 
             // Don't add past received packets to the window or write to file
-            if (packet.offset < receiveWindowBase) {
+            if (packet.offset < receiveWindowBase || packet.flag == FIN) {
                 continue;
             }
 
             // Place the packet into the buffer in order within receive window
             for (int i = 0; i < WINDOW_SIZE / MAX_PACKET_SIZE; i++) {
                 if (receiveWindowBase + i * MAX_PACKET_SIZE == packet.offset) {
+                    bzero(&receiveWindow[i], sizeof(struct Packet));
                     receiveWindow[i] = packet;
                     receiveWindow[i].received = 1;
                     printWindow(receiveWindow, WINDOW_SIZE / MAX_PACKET_SIZE);
@@ -133,7 +152,10 @@ int main(int argc, char *argv[])
                 for (int j = 0; j < WINDOW_SIZE / MAX_PACKET_SIZE; j++) {
                     if (receiveWindow[j].received) {
                         printf("Wrote packet %d to file\n", receiveWindow[j].offset);
-                        writeToFile(fp, receiveWindow[j].payload);
+                        char payload[PAYLOAD_SIZE + 1];
+                        bzero(payload, PAYLOAD_SIZE + 1);
+                        memcpy(&payload, receiveWindow[j].payload, PAYLOAD_SIZE);
+                        writeToFile(fp, payload);
                     } else {
                         // Move remaining packets to front of window
                         receiveWindowBase = receiveWindow[j - 1].offset + MAX_PACKET_SIZE;

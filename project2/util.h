@@ -2,6 +2,8 @@
 #define UTIL_H
 
 #include <sys/time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 static const struct timeval TIMEOUT = {0, 500000};
 #define WINDOW_SIZE 5120
@@ -10,9 +12,9 @@ static const struct timeval TIMEOUT = {0, 500000};
 
 void error(char *msg);
 
-enum Flag { NONE, RETRANSMISSION, SYN, FIN, SYN_ACK, ACK };
+enum Flag { NONE, RETRANSMISSION, SYN, FIN, SYN_ACK, ACK, FIN_ACK };
 // Leave 1 char for NULL termination
-#define PAYLOAD_SIZE (MAX_PACKET_SIZE - 2 * sizeof(int) - sizeof(enum Flag) + 1)
+#define PAYLOAD_SIZE (MAX_PACKET_SIZE - 2 * sizeof(int) - sizeof(enum Flag))
 
 struct Packet
 {
@@ -35,6 +37,13 @@ void packetToBytes(const struct Packet *packet, char *byteArray);
 
 void bytesToPacket(struct Packet *packet, const char *byteArray);
 
+
 int getSequenceNumber(const int offset);
+
+void writeDataToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
+
+void writePacketToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const struct Packet *packet);
+
+void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
 
 #endif

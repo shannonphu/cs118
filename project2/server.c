@@ -16,8 +16,6 @@
 void sigchld_handler(int s);
 int checkCorrectFile(const char *path);
 struct Packet** getPacketsResponse(const char *fileName, int *numPackets);
-void writePacketSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength, const char *data);
-void writeErrorToSocket(const int socket, struct sockaddr_in* socketAddress, socklen_t socketLength);
 int getNumberPacketsForSize(long size);
 long getFileSize(const char *fileName);
 void setPacketReceived(struct Packet **packets, int numPackets, int offset);
@@ -89,18 +87,15 @@ int main(int argc, char *argv[]) {
 
         // Received file request
         if (clientPacket.flag == SYN) {
-            // Reset congestion window bounds
-            windowLeftBound = 0;
-            windowRightBound = WINDOW_SIZE;
-
-            // Free previous responses
-            freeResponse(response, numPackets);
             response = getPacketsResponse(clientPacket.payload, &numPackets);
             if (response == NULL) {
                 writeErrorToSocket(sockfd, &cli_addr, clilen);
                 continue;
             }
 
+            // Reset congestion window bounds
+            windowLeftBound = 0;
+            windowRightBound = WINDOW_SIZE;
             maxWindowRightBound = numPackets * MAX_PACKET_SIZE;
         } else if (clientPacket.flag == ACK) {
             printf("\tReceived ACK for packet %d\n", getSequenceNumber(clientPacket.ackNum));
@@ -124,6 +119,19 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }      
+        } else if (clientPacket.flag == FIN_ACK) {
+            // Free previous responses
+            freeResponse(response, numPackets);
+            windowLeftBound = maxWindowRightBound;
+            printf("Finished sending response\n");
+
+            // Send ACK for FIN_ACK
+            struct Packet ackPacket;
+            ackPacket.flag = ACK;
+            ackPacket.offset = maxWindowRightBound;
+            ackPacket.ackNum = clientPacket.offset;
+            writePacketToSocket(sockfd, &cli_addr, clilen, &ackPacket);
+            continue;
         }
 
         // Send each packet to client from window
@@ -136,35 +144,11 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            // Make packet to write
-            char packet[MAX_PACKET_SIZE];
-            bzero(packet, MAX_PACKET_SIZE);
-            packetToBytes(packetPtr, packet);
-            writePacketSocket(sockfd, &cli_addr, clilen, packet);
+            writePacketToSocket(sockfd, &cli_addr, clilen, packetPtr);
             printf("\tSent packet w/ seqNum %d\n", getSequenceNumber(packetPtr->offset));                
         }
     }
     return 0;
-}
-
-void writeErrorToSocket(const int socket, 
-                struct sockaddr_in* socketAddress, 
-                socklen_t socketLength)
-{
-    writePacketSocket(socket, (struct sockaddr_in *)socketAddress, socketLength, "404: The requested file cannot be found or opened.");
-}
-
-// Writes MAX_PACKET_SIZE amount in bytes from data to socket.
-void writePacketSocket(const int socket, 
-                struct sockaddr_in* socketAddress, 
-                socklen_t socketLength, 
-                const char *data) 
-{
-    int n = sendto(socket, data, MAX_PACKET_SIZE, 0, (struct sockaddr *)socketAddress, socketLength);
-
-    if (n < 0) {
-        error("ERROR sending data to socket");
-    }
 }
 
 // Make array of pointers to Packet structs which hold the header and 
@@ -181,6 +165,7 @@ struct Packet** getPacketsResponse(const char *fileName, int *numPackets) {
         packets[1] = initPacket("\0", MAX_PACKET_SIZE, -1, FIN);
         *numPackets = 2;
     } else {
+        // TODO add final ACK in here
         int packetCount = getNumberPacketsForSize(fsize);
         packets = malloc((packetCount + 1) * sizeof(struct Packet *));
 

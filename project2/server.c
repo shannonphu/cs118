@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
             }
 
             writePacketToSocket(sockfd, &cli_addr, clilen, packetPtr);
-            char flagName[3];
+            char flagName[3] = {0};
             getFlagName(packetPtr->flag, flagName);
             printf("Sending packet %d %d %s\n", getSequenceNumber(packetPtr->offset), WINDOW_SIZE, flagName);
         }

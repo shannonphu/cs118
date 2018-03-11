@@ -67,10 +67,10 @@ int getSequenceNumber(const int offset) {
 void getFlagName(enum Flag flag, char *name) {
     switch (flag) {
         case SYN:
-            name = "SYN";
+            strcpy(name, "SYN");
             break;
         case FIN:
-            name = "FIN";
+            strcpy(name, "FIN");
             break;
         default:
             name = "";

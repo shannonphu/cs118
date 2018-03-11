@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
             ackPacket.ackNum = packet.offset;
             writePacketToSocket(sockfd, &serv_addr, serverlen, &ackPacket);
 
-            char flagName[3];
+            char flagName[3] = {0};
             getFlagName(ackPacket.flag, flagName);
 
             // Don't add past received packets to the window or write to file

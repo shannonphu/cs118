@@ -12,4 +12,4 @@ client: $(CLIENT_OBJ)
 	$(CC) $^ -o $@ $(CFLAGS)
 
 clean:
-	$(RM) *.o server client
+	$(RM) *.o server client received.data
